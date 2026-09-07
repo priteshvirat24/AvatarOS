@@ -1,0 +1,101 @@
+# ==============================================================================
+# Google Cloud Build Pipeline for AVATAROS
+# Builds and deploys AVATAROS Backend and Frontend to Google Cloud Run
+# ==============================================================================
+
+steps:
+  # ----------------------------------------------------------------------------
+  # Step 1: Build Backend Container (Python 3.12 + FFmpeg + Google GenAI)
+  # ----------------------------------------------------------------------------
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/avataros-repo/avataros-backend:$COMMIT_SHA'
+      - '-t'
+      - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/avataros-repo/avataros-backend:latest'
+      - '-f'
+      - 'backend/Dockerfile'
+      - '.'
+    id: 'build-backend'
+
+  # ----------------------------------------------------------------------------
+  # Step 2: Build Frontend Container (Vite + React SPA on Nginx)
+  # ----------------------------------------------------------------------------
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/avataros-repo/avataros-frontend:$COMMIT_SHA'
+      - '-t'
+      - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/avataros-repo/avataros-frontend:latest'
+      - '-f'
+      - 'frontend/Dockerfile'
+      - '.'
+    id: 'build-frontend'
+
+  # ----------------------------------------------------------------------------
+  # Step 3: Push Backend Image to Artifact Registry
+  # ----------------------------------------------------------------------------
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/avataros-repo/avataros-backend:$COMMIT_SHA'
+    id: 'push-backend'
+
+  # ----------------------------------------------------------------------------
+  # Step 4: Push Frontend Image to Artifact Registry
+  # ----------------------------------------------------------------------------
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/avataros-repo/avataros-frontend:$COMMIT_SHA'
+    id: 'push-frontend'
+
+  # ----------------------------------------------------------------------------
+  # Step 5: Deploy Backend to Google Cloud Run
+  # ----------------------------------------------------------------------------
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'avataros-backend'
+      - '--image=$_LOCATION-docker.pkg.dev/$PROJECT_ID/avataros-repo/avataros-backend:$COMMIT_SHA'
+      - '--region=$_LOCATION'
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+      - '--port=8000'
+      - '--memory=2Gi'
+      - '--cpu=2'
+      - '--set-env-vars=APP_ENV=production,HOST=0.0.0.0,PORT=8000,MEDIA_STORAGE_PROVIDER=local'
+      - '--set-secrets=GEMINI_API_KEY=GEMINI_API_KEY:latest'
+    id: 'deploy-backend'
+
+  # ----------------------------------------------------------------------------
+  # Step 6: Deploy Frontend to Google Cloud Run
+  # ----------------------------------------------------------------------------
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'avataros-frontend'
+      - '--image=$_LOCATION-docker.pkg.dev/$PROJECT_ID/avataros-repo/avataros-frontend:$COMMIT_SHA'
+      - '--region=$_LOCATION'
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+      - '--port=3000'
+      - '--memory=512Mi'
+      - '--cpu=1'
+    id: 'deploy-frontend'
+
+substitutions:
+  _LOCATION: 'us-central1'
+
+images:
+  - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/avataros-repo/avataros-backend:$COMMIT_SHA'
+  - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/avataros-repo/avataros-frontend:$COMMIT_SHA'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
