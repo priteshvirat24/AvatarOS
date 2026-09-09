@@ -91,6 +91,18 @@ class GoogleGeminiASRProvider(BaseASRProvider):
             data = json.loads(raw_text)
             transcript = ASRTranscript.model_validate(data)
 
+            # Recompute the word count from the transcript rather than trusting
+            # the model's own tally. Asking a model to count its output invites a
+            # hallucinated number - this field came back as 6.1e19 in testing -
+            # and the Guardian's script-adherence check divides by it.
+            transcript.word_count = len((transcript.transcript_text or "").split())
+
+            # Confidence must stay in range whatever the model reports.
+            try:
+                transcript.confidence = max(0.0, min(1.0, float(transcript.confidence)))
+            except (TypeError, ValueError):
+                transcript.confidence = 0.0
+
             app_logger.log_operation(
                 trace_id=trace_id,
                 operation="asr_transcribe",

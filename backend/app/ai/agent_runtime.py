@@ -9,10 +9,19 @@ from backend.app.logging import app_logger
 
 T = TypeVar("T", bound=BaseModel)
 
-class ADKAgent:
+class StructuredAgent:
     """
-    Google ADK-compatible In-Process Agent Runtime for AVATAROS.
-    Binds Agent Role, System Instruction, Allowed Tool Capabilities, and Structured Output Schema.
+    AVATAROS in-process agent runtime.
+
+    Binds an agent role, system instruction, allowed tool capabilities and a
+    structured output schema, then executes against whichever AI provider is
+    configured (Gemini, or the deterministic engine).
+
+    This is AVATAROS's own runtime, not Google's Agent Development Kit. It was
+    previously named ADKAgent and described as "Google ADK-compatible", which implied an
+    integration that does not exist - `google-cloud-aiplatform[adk]` is not a
+    dependency of this project. The behaviour is unchanged; only the name now
+    matches what the code actually is.
     """
     def __init__(
         self,
@@ -37,7 +46,7 @@ class ADKAgent:
         """
         app_logger.log_operation(
             trace_id=trace_id,
-            operation="adk_agent_start",
+            operation="agent_run_start",
             status="RUNNING",
             agent_task=self.agent_name,
             details={"prompt_len": len(prompt), "target_schema": response_model.__name__}
@@ -52,7 +61,7 @@ class ADKAgent:
 
         app_logger.log_operation(
             trace_id=trace_id,
-            operation="adk_agent_complete",
+            operation="agent_run_complete",
             status="SUCCESS",
             agent_task=self.agent_name,
             details={"target_schema": response_model.__name__}

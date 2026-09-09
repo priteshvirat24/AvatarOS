@@ -1,7 +1,7 @@
 from typing import Optional, List, Dict, Any
 from backend.app.models.dna import DigitalDNA
 from backend.app.models.script import Script, ScriptScene, ScriptLine
-from backend.app.ai.adk_runtime import ADKAgent
+from backend.app.ai.agent_runtime import StructuredAgent
 from backend.app.ai.prompts.script import SCRIPT_SYSTEM_PROMPT, SCRIPT_USER_PROMPT
 from backend.app.logging import app_logger
 
@@ -11,8 +11,8 @@ class ScriptAgent:
     Generates structured 5-scene video production script via Gemini structured output.
     Enforces deterministic claim-reference validation and Digital DNA speech guards.
     """
-    def __init__(self, adk_agent: Optional[ADKAgent] = None):
-        self.adk_agent = adk_agent or ADKAgent(
+    def __init__(self, agent_runtime: Optional[StructuredAgent] = None):
+        self.agent_runtime = agent_runtime or StructuredAgent(
             agent_name="script_agent",
             system_instruction=SCRIPT_SYSTEM_PROMPT,
             allowed_tools=["get_character_dna", "get_rights", "get_active_strategy"]
@@ -57,17 +57,61 @@ class ScriptAgent:
             verified_claims_context=claims_ctx
         )
 
-        # 1. Gemini structured generation via ADK runtime
-        script: Script = self.adk_agent.run_structured(
+        # 1. Gemini structured generation via the agent runtime
+        script: Script = self.agent_runtime.run_structured(
             prompt=prompt,
             response_model=Script,
             trace_id=trace_id
         )
 
-        # 2. Deterministic Validation Layer
+        # 2. Structural guard.
+        #
+        # A live model occasionally returns a schema-valid Script with no scenes
+        # at all. Downstream stages index scenes positionally, so an empty script
+        # crashed the entire production run - and because validation only *logged*
+        # the deviation, the pipeline sailed on into an IndexError. Detecting a
+        # structurally unusable script has to mean refusing to use it.
+        if not self._is_structurally_usable(script):
+            app_logger.log_operation(
+                trace_id=trace_id,
+                operation="script_structure_rejected",
+                status="FALLBACK",
+                agent_task="script_agent",
+                details={
+                    "scene_count": len(script.scenes),
+                    "reason": "model returned a script the pipeline cannot stage",
+                    "action": "regenerating deterministically",
+                },
+            )
+            script = self._deterministic_script(character_dna, trace_id)
+
+        # 3. Deterministic Validation Layer
         self._validate_script(script, character_dna, trace_id)
 
         return script
+
+    @staticmethod
+    def _is_structurally_usable(script: Script) -> bool:
+        """
+        A script is usable only if every scene the pipeline will stage exists and
+        actually carries a spoken line. Scene count is checked against what
+        downstream stages index, not against a style preference.
+        """
+        if not script or not script.scenes:
+            return False
+        if len(script.scenes) < 5:
+            return False
+        return all(sc.lines and sc.lines[0].text.strip() for sc in script.scenes[:5])
+
+    def _deterministic_script(self, character_dna: DigitalDNA, trace_id: str) -> Script:
+        """Falls back to the offline generator, which always produces 5 staged scenes."""
+        from backend.app.ai.provider import DeterministicFallbackAIProvider
+
+        return DeterministicFallbackAIProvider().generate_structured(
+            prompt="",
+            response_model=Script,
+            trace_id=trace_id,
+        )
 
     def _validate_script(self, script: Script, character_dna: DigitalDNA, trace_id: str) -> None:
         """

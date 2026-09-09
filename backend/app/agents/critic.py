@@ -3,7 +3,7 @@ from typing import List, Optional, Dict, Any
 from backend.app.models.dna import DigitalDNA
 from backend.app.models.script import Script, CriticReport, CriticIssue
 from backend.app.data.documents import SEED_CLAIMS
-from backend.app.ai.adk_runtime import ADKAgent
+from backend.app.ai.agent_runtime import StructuredAgent
 from backend.app.ai.prompts.critic import CRITIC_SYSTEM_PROMPT, CRITIC_USER_PROMPT
 from backend.app.logging import app_logger
 
@@ -13,8 +13,8 @@ class CriticAgent:
     Performs Gemini-assisted adversarial critique with deterministic safety verification overlay.
     Enforces bounded revision loop (max 3 rounds).
     """
-    def __init__(self, adk_agent: Optional[ADKAgent] = None):
-        self.adk_agent = adk_agent or ADKAgent(
+    def __init__(self, agent_runtime: Optional[StructuredAgent] = None):
+        self.agent_runtime = agent_runtime or StructuredAgent(
             agent_name="critic_agent",
             system_instruction=CRITIC_SYSTEM_PROMPT,
             allowed_tools=["get_character_dna", "get_rights", "get_active_strategy"]
@@ -43,8 +43,8 @@ class CriticAgent:
             claims_status_json=claims_json
         )
 
-        # 1. Gemini adversarial reasoning via ADK
-        report: CriticReport = self.adk_agent.run_structured(
+        # 1. Gemini adversarial reasoning via the agent runtime
+        report: CriticReport = self.agent_runtime.run_structured(
             prompt=prompt,
             response_model=CriticReport,
             trace_id=trace_id

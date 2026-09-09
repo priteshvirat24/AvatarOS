@@ -74,7 +74,7 @@ class MediaInspectorEngine:
                 "-show_streams",
                 abs_path
             ]
-            res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=5)
+            res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=settings.MEDIA_SUBPROCESS_TIMEOUT)
             if res.returncode == 0 and res.stdout.strip():
                 data = json.loads(res.stdout)
                 fmt = data.get("format", {})
@@ -125,7 +125,7 @@ class MediaInspectorEngine:
         if not probe_success:
             try:
                 cmd = [self.ffmpeg_bin, "-i", abs_path]
-                res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=5)
+                res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=settings.MEDIA_SUBPROCESS_TIMEOUT)
                 out = res.stderr or res.stdout
                 if "Video:" in out:
                     has_video = True
@@ -228,7 +228,7 @@ class MediaInspectorEngine:
                 "-y", frame_path
             ]
             try:
-                subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, timeout=5)
+                subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, timeout=settings.MEDIA_SUBPROCESS_TIMEOUT)
                 sha = self._compute_file_sha256(frame_path) if os.path.exists(frame_path) else ""
                 frames.append(ExtractedFrame(
                     timestamp_s=ts,
@@ -277,7 +277,7 @@ class MediaInspectorEngine:
             "-y", target_wav
         ]
         try:
-            subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, timeout=10)
+            subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, timeout=settings.MEDIA_SUBPROCESS_TIMEOUT)
             sha = self._compute_file_sha256(target_wav) if os.path.exists(target_wav) else ""
             app_logger.log_operation(
                 trace_id=trace_id,

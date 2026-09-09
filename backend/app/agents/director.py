@@ -2,7 +2,7 @@ from typing import Optional
 from backend.app.models.script import Script
 from backend.app.models.director import DirectorPlan, SceneShot, CutawaySpec
 from backend.app.models.events import ProductionStrategy
-from backend.app.ai.adk_runtime import ADKAgent
+from backend.app.ai.agent_runtime import StructuredAgent
 from backend.app.ai.prompts.director import DIRECTOR_SYSTEM_PROMPT, DIRECTOR_USER_PROMPT
 from backend.app.logging import app_logger
 
@@ -12,8 +12,8 @@ class DirectorAgent:
     Converts approved script into production plan via Gemini structured planning.
     Directly incorporates Evolution Agent's learned strategy from ClickHouse telemetry.
     """
-    def __init__(self, adk_agent: Optional[ADKAgent] = None):
-        self.adk_agent = adk_agent or ADKAgent(
+    def __init__(self, agent_runtime: Optional[StructuredAgent] = None):
+        self.agent_runtime = agent_runtime or StructuredAgent(
             agent_name="director_agent",
             system_instruction=DIRECTOR_SYSTEM_PROMPT,
             allowed_tools=["get_character_dna", "get_active_strategy"]
@@ -55,8 +55,8 @@ class DirectorAgent:
             target_audience=target_audience
         )
 
-        # 1. Gemini structured generation via ADK
-        agent = ADKAgent(
+        # 1. Gemini structured generation via the agent runtime
+        agent = StructuredAgent(
             agent_name="director_agent",
             system_instruction=system_instruction,
             allowed_tools=["get_character_dna", "get_active_strategy"]

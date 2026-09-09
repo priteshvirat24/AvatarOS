@@ -16,14 +16,6 @@ from backend.app.models.live import (
 )
 from backend.app.logging import app_logger
 
-try:
-    from mistralai.client import Mistral
-except ImportError:
-    try:
-        from mistralai import Mistral
-    except ImportError:
-        Mistral = None
-
 class BaseConversationalProvider(ABC):
     """
     Abstract Base Class for Turn-Based Conversational Reasoning & Text Planning Models (Milestone 6).
@@ -513,18 +505,19 @@ class DeterministicLiveFallback(BaseLiveProvider):
         return session
 
 
-class MistralLiveProvider(BaseLiveProvider, BaseConversationalProvider):
+class GeminiTurnBasedProvider(BaseLiveProvider, BaseConversationalProvider):
     """
-    Production Mistral Conversational & Turn-Based Fallback Provider (Milestone 6).
+    Gemini turn-based conversational provider (fast tier).
 
     ARCHITECTURAL DESIGNATION:
-    The Mistral API provides text-based conversational LLM reasoning, structured
-    turn generation, and multilingual chat completions. It does NOT provide a native
-    bidirectional realtime audio streaming WebSocket transport equivalent to Gemini Live.
+    This tier uses the Google GenAI `generate_content` API with `settings.GEMINI_MODEL`
+    (default `gemini-2.5-flash`). It provides text conversational reasoning and structured
+    turn generation, but NOT the native bidirectional realtime audio streaming transport
+    that the Gemini Live API provides.
 
-    Therefore, Mistral is honestly designated as:
-    - Provider: 'mistral'
-    - Role: Conversational LLM reasoning & turn-based fallback
+    Therefore this tier is honestly designated as:
+    - Provider: 'gemini_turn_based'
+    - Role: Conversational LLM reasoning & turn-based fallback below Gemini Live
     - Degraded mode: True (turn-based, not realtime audio)
     - Native realtime audio: False
 
@@ -538,16 +531,16 @@ class MistralLiveProvider(BaseLiveProvider, BaseConversationalProvider):
     def __init__(self, fallback: Optional[BaseLiveProvider] = None):
         self.fallback = fallback or DeterministicLiveFallback()
         self._client = None
-        if settings.MISTRAL_API_KEY:
+        if settings.GEMINI_API_KEY:
             try:
-                if Mistral is not None:
-                    self._client = Mistral(api_key=settings.MISTRAL_API_KEY.get_secret_value())
+                from google import genai
+                self._client = genai.Client(api_key=settings.GEMINI_API_KEY.get_secret_value())
             except Exception as e:
                 app_logger.log_operation(
                     trace_id="system",
-                    operation="mistral_client_init",
+                    operation="gemini_turn_client_init",
                     status="FALLBACK",
-                    agent_task="mistral_live_provider",
+                    agent_task="gemini_turn_provider",
                     details={"error": str(e)}
                 )
 
@@ -558,7 +551,7 @@ class MistralLiveProvider(BaseLiveProvider, BaseConversationalProvider):
         language: str = "en",
         trace_id: str = "system"
     ) -> LiveSession:
-        if not self._client or not settings.MISTRAL_API_KEY:
+        if not self._client or not settings.GEMINI_API_KEY:
             return self.fallback.create_session(character_dna, rights_ref, language, trace_id)
 
         session_id = f"live_{uuid.uuid4().hex[:12]}"
@@ -574,7 +567,7 @@ class MistralLiveProvider(BaseLiveProvider, BaseConversationalProvider):
             created_at=now_iso,
             last_activity_at=now_iso,
             status="ACTIVE",
-            provider="mistral",
+            provider="gemini_turn_based",
             degraded_mode=True,
             is_realtime=False,
             session_memory_id=f"smem_{session_id}",
@@ -589,12 +582,12 @@ class MistralLiveProvider(BaseLiveProvider, BaseConversationalProvider):
             trace_id=trace_id,
             operation="live_session_created",
             status="SUCCESS_DEGRADED",
-            agent_task="mistral_live_provider",
+            agent_task="gemini_turn_provider",
             details={
                 "session_id": session_id,
                 "character_id": character_dna.character_id,
-                "provider": "mistral",
-                "model": settings.MISTRAL_MODEL,
+                "provider": "gemini_turn_based",
+                "model": settings.GEMINI_MODEL,
                 "language": language,
                 "degraded_mode": True,
                 "mode": "turn_based_fallback"
@@ -617,7 +610,7 @@ class MistralLiveProvider(BaseLiveProvider, BaseConversationalProvider):
         audio_chunk: Optional[bytes] = None,
         trace_id: str = "system"
     ) -> LiveTurnResponse:
-        if not self._client or not settings.MISTRAL_API_KEY:
+        if not self._client or not settings.GEMINI_API_KEY:
             return self.fallback.process_turn(session, user_text, audio_chunk, trace_id)
 
         start_time = time.time()
@@ -662,8 +655,8 @@ class MistralLiveProvider(BaseLiveProvider, BaseConversationalProvider):
                     trace_id=trace_id,
                     operation="live_restricted_topic_deflection",
                     status="DEFLECTED",
-                    agent_task="mistral_live_provider",
-                    details={"session_id": session.session_id, "topic": restricted, "provider": "mistral"}
+                    agent_task="gemini_turn_provider",
+                    details={"session_id": session.session_id, "topic": restricted, "provider": "gemini_turn_based"}
                 )
 
                 return LiveTurnResponse(
@@ -674,7 +667,7 @@ class MistralLiveProvider(BaseLiveProvider, BaseConversationalProvider):
                     gesture_profile="measured_boundary_gesture",
                     dna_locked=True,
                     character_version=session.character_version,
-                    provider="mistral",
+                    provider="gemini_turn_based",
                     degraded_mode=True,
                     latency_breakdown={
                         "asr_ms": 30,
@@ -707,21 +700,26 @@ class MistralLiveProvider(BaseLiveProvider, BaseConversationalProvider):
             gesture = "confident_technical_v2"
 
         try:
+            from google.genai import types as genai_types
+
             sys_inst = (
                 f"You are {session.character_id.capitalize()} (version {session.character_version}), a persistent digital human. "
                 f"Your active audience register is '{session.active_register}'. Speak naturally and concisely in {session.language}. "
                 f"Strict safety: Never provide advice on {restricted_topics}. "
                 f"Only use verified factual claims about the Titan AI laptop: 40% faster MLPerf inference, 18-hour battery, 45 TOPS NPU."
             )
-            response = self._client.chat.complete(
-                model=settings.MISTRAL_MODEL,
-                messages=[
-                    {"role": "system", "content": sys_inst},
-                    {"role": "user", "content": user_text}
-                ],
-                temperature=0.2
+            response = self._client.models.generate_content(
+                model=settings.GEMINI_MODEL,
+                contents=user_text,
+                config=genai_types.GenerateContentConfig(
+                    system_instruction=sys_inst,
+                    temperature=settings.GEMINI_TEMPERATURE,
+                    max_output_tokens=settings.GEMINI_MAX_OUTPUT_TOKENS
+                )
             )
-            reply_text = response.choices[0].message.content if (response and response.choices) else "I understand. Let's continue discussing the Titan platform."
+            reply_text = (response.text or "").strip() if response is not None else ""
+            if not reply_text:
+                raise ValueError("Gemini returned an empty turn-based response")
             elapsed_ms = (time.time() - start_time) * 1000
 
             turn_id = f"turn_{session.turn_count + 1}"
@@ -755,15 +753,15 @@ class MistralLiveProvider(BaseLiveProvider, BaseConversationalProvider):
 
             app_logger.log_operation(
                 trace_id=trace_id,
-                operation="mistral_turn_completed",
+                operation="gemini_turn_completed",
                 status="SUCCESS",
-                agent_task="mistral_live_provider",
+                agent_task="gemini_turn_provider",
                 details={
                     "session_id": session.session_id,
                     "register": session.active_register,
                     "latency_ms": elapsed_ms,
-                    "model": settings.MISTRAL_MODEL,
-                    "provider": "mistral"
+                    "model": settings.GEMINI_MODEL,
+                    "provider": "gemini_turn_based"
                 }
             )
 
@@ -775,7 +773,7 @@ class MistralLiveProvider(BaseLiveProvider, BaseConversationalProvider):
                 gesture_profile=gesture,
                 dna_locked=True,
                 character_version=session.character_version,
-                provider="mistral",
+                provider="gemini_turn_based",
                 degraded_mode=True,
                 latency_breakdown={
                     "asr_ms": 110,
@@ -790,10 +788,10 @@ class MistralLiveProvider(BaseLiveProvider, BaseConversationalProvider):
         except Exception as e:
             app_logger.log_operation(
                 trace_id=trace_id,
-                operation="mistral_turn_fallback",
+                operation="gemini_turn_fallback",
                 status="NOTICE",
-                agent_task="mistral_live_provider",
-                details={"message": "Mistral turn fallback activated", "error": str(e)}
+                agent_task="gemini_turn_provider",
+                details={"message": "Gemini turn-based fallback activated", "error": str(e)}
             )
             return self.fallback.process_turn(session, user_text, audio_chunk, trace_id)
 
@@ -806,32 +804,25 @@ class MistralLiveProvider(BaseLiveProvider, BaseConversationalProvider):
 
 def get_default_live_fallback() -> BaseLiveProvider:
     """
-    Returns the appropriate fallback provider: Mistral if configured, otherwise deterministic.
+    Returns the tier below Gemini Live: the Gemini turn-based provider when a
+    GEMINI_API_KEY is configured, otherwise the deterministic offline engine.
     """
-    if settings.MISTRAL_API_KEY:
-        return MistralLiveProvider(fallback=DeterministicLiveFallback())
+    if settings.GEMINI_API_KEY:
+        return GeminiTurnBasedProvider(fallback=DeterministicLiveFallback())
     return DeterministicLiveFallback()
 
 
 def get_live_provider() -> BaseLiveProvider:
     """
     Factory returning active Live Mode provider based on centralized configuration:
-    1. If LIVE_PROVIDER == 'gemini_live' and GEMINI_API_KEY is configured:
-       returns GeminiLiveProvider (with Mistral or deterministic fallback).
-    2. If LIVE_PROVIDER == 'mistral' and MISTRAL_API_KEY is configured:
-       returns MistralLiveProvider (with deterministic fallback).
-    3. If LIVE_PROVIDER == 'gemini_live' (configured for real-time) but GEMINI_API_KEY is missing,
-       and MISTRAL_API_KEY is present:
-       returns MistralLiveProvider in degraded turn-based mode.
-    4. Otherwise returns DeterministicLiveFallback.
+    1. LIVE_PROVIDER == 'gemini_live' and GEMINI_API_KEY configured:
+       GeminiLiveProvider (realtime), falling back to the Gemini turn-based tier.
+    2. LIVE_PROVIDER == 'gemini_turn_based' and GEMINI_API_KEY configured:
+       GeminiTurnBasedProvider (turn-based), falling back to deterministic.
+    3. Otherwise: DeterministicLiveFallback (labelled offline in the UI).
     """
-    mistral_fallback = get_default_live_fallback()
-
     if settings.LIVE_PROVIDER == "gemini_live" and settings.GEMINI_API_KEY:
-        return GeminiLiveProvider(fallback=mistral_fallback)
-    elif settings.LIVE_PROVIDER == "mistral" and settings.MISTRAL_API_KEY:
-        return MistralLiveProvider(fallback=DeterministicLiveFallback())
-    elif settings.MISTRAL_API_KEY and settings.LIVE_PROVIDER == "gemini_live":
-        # Graceful degradation from unconfigured Gemini Live to available Mistral turn-based fallback
-        return mistral_fallback
+        return GeminiLiveProvider(fallback=get_default_live_fallback())
+    if settings.LIVE_PROVIDER == "gemini_turn_based" and settings.GEMINI_API_KEY:
+        return GeminiTurnBasedProvider(fallback=DeterministicLiveFallback())
     return DeterministicLiveFallback()

@@ -1,4 +1,5 @@
 import json
+import threading
 import time
 from abc import ABC, abstractmethod
 from typing import Type, TypeVar, Optional, List, Dict, Any, Callable
@@ -159,9 +160,68 @@ class DeterministicFallbackAIProvider(BaseAIProvider):
         return f"[Deterministic Fallback Response for trace {trace_id}]: Analyzed prompt with 100% compliance."
 
 
+# ---------------------------------------------------------------------------
+# Model resolution
+#
+# Model IDs are not stable over a judging window: the 2.x family stopped being
+# served to new API keys, and a pinned ID that 404s would take the whole agent
+# chain down. The active model is resolved once against the live API and cached,
+# falling back through GEMINI_MODEL_FALLBACKS. The resolved ID is reported in the
+# provider matrix, so what the UI shows is what actually answered.
+# ---------------------------------------------------------------------------
+
+_MODEL_CACHE: Dict[str, str] = {}
+_MODEL_LOCK = threading.Lock()
+
+
+def resolve_gemini_model(client: Any, preferred: str, trace_id: str = "system") -> str:
+    """Returns the first model in the chain that the API actually serves."""
+    cached = _MODEL_CACHE.get(preferred)
+    if cached:
+        return cached
+
+    with _MODEL_LOCK:
+        cached = _MODEL_CACHE.get(preferred)
+        if cached:
+            return cached
+
+        for candidate in [preferred, *settings.GEMINI_MODEL_FALLBACKS]:
+            try:
+                client.models.generate_content(model=candidate, contents="ping")
+            except Exception as exc:
+                app_logger.log_operation(
+                    trace_id=trace_id,
+                    operation="gemini_model_probe",
+                    status="UNAVAILABLE",
+                    agent_task="gemini_provider",
+                    details={"model": candidate, "error": str(exc)[:200]},
+                )
+                continue
+
+            if candidate != preferred:
+                app_logger.log_operation(
+                    trace_id=trace_id,
+                    operation="gemini_model_resolved",
+                    status="FALLBACK",
+                    agent_task="gemini_provider",
+                    details={"requested": preferred, "using": candidate},
+                )
+            _MODEL_CACHE[preferred] = candidate
+            return candidate
+
+        # Nothing in the chain answered. Return the preferred ID so the caller
+        # fails with the real API error rather than a misleading one.
+        return preferred
+
+
+def active_gemini_model() -> Optional[str]:
+    """The model that last answered, for honest reporting in the provider matrix."""
+    return _MODEL_CACHE.get(settings.GEMINI_MODEL)
+
+
 class GoogleGeminiProvider(BaseAIProvider):
     """
-    Production AI Provider using Google GenAI SDK (Gemini 2.5 Flash / Pro).
+    Production AI Provider using the Google GenAI SDK.
     Enforces native JSON schema output and bounded retry for malformed payloads.
     """
     def __init__(self, fallback: Optional[BaseAIProvider] = None):
@@ -212,8 +272,9 @@ class GoogleGeminiProvider(BaseAIProvider):
                     response_schema=response_model
                 )
 
+                model_id = resolve_gemini_model(self._client, settings.GEMINI_MODEL, trace_id)
                 response = self._client.models.generate_content(
-                    model=settings.GEMINI_MODEL,
+                    model=model_id,
                     contents=prompt,
                     config=config
                 )
@@ -228,7 +289,7 @@ class GoogleGeminiProvider(BaseAIProvider):
                     status="SUCCESS",
                     duration_ms=(time.time() - start_time) * 1000,
                     agent_task="gemini_provider",
-                    details={"model": settings.GEMINI_MODEL, "target_schema": response_model.__name__, "attempt": attempt}
+                    details={"model": model_id, "target_schema": response_model.__name__, "attempt": attempt}
                 )
                 return validated_model
 

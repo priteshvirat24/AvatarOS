@@ -12,6 +12,31 @@ from backend.app.models.dna import DigitalDNA
 from backend.app.models.performance import ScenePerformanceSpec, PerformancePlan
 from backend.app.logging import app_logger
 
+def _ff_text(value: str, limit: int = 70) -> str:
+    """
+    Escapes a string for use as a drawtext `text=` value inside -filter_complex.
+
+    Determined empirically against FFmpeg 7, because the rules are layered and not
+    obvious:
+
+    * `:` separates filter options and breaks parsing even inside single quotes,
+      so it needs exactly one backslash. Two backslashes fail differently.
+    * `%` is left alone here; every drawtext in this module sets `expansion=none`,
+      which makes `%` literal. Escaping it instead yields a "Stray %" warning.
+    * Quotes and backslashes are stripped rather than escaped - their escaping
+      differs between the shell, the filtergraph parser and drawtext itself.
+
+    Getting this wrong does not produce a visible failure: ffmpeg errors, the
+    caller falls back, and the result is a blank video that looks like a
+    successful render.
+    """
+    text = str(value or "")
+    text = text.replace("\\", "").replace("'", "").replace('"', "")
+    if len(text) > limit:
+        text = text[:limit].rstrip() + "..."
+    return text.replace(":", r"\:")
+
+
 class RenderSceneResult(BaseModel):
     scene_no: int
     video_path: str
@@ -84,6 +109,21 @@ class DeterministicAvatarRenderer(BaseAvatarRenderer):
         os.makedirs(self.media_dir, exist_ok=True)
         self.ffmpeg_bin = settings.get_ffmpeg_executable()
 
+    @staticmethod
+    def _audio_duration_s(audio_path: Optional[str]) -> float:
+        """Length of a WAV track in seconds, or 0.0 if it cannot be read."""
+        if not audio_path or not os.path.exists(audio_path):
+            return 0.0
+        try:
+            import wave
+
+            with wave.open(audio_path, "rb") as wav:
+                rate = wav.getframerate()
+                return wav.getnframes() / float(rate) if rate else 0.0
+        except Exception:
+            # Non-WAV or unreadable: fall back to the planned duration.
+            return 0.0
+
     def render_scene(
         self,
         scene_no: int,
@@ -98,15 +138,25 @@ class DeterministicAvatarRenderer(BaseAvatarRenderer):
         trace_id: str = "system"
     ) -> RenderSceneResult:
         start_time = time.time()
-        safe_text = text.replace("'", "").replace('"', '').replace(":", " -")[:70]
-        if len(text) > 70:
-            safe_text += "..."
+        safe_text = _ff_text(text)
 
         out_filename = f"scene_{scene_no}_{language}_{aspect.replace(':', 'x')}.mp4"
         out_path = os.path.join(self.media_dir, out_filename)
 
         dim = "1280x720" if aspect == "16:9" else "720x1280"
-        dur = min(duration_s, 15.0)  # Bounded duration
+
+        # The scene must be at least as long as the speech it carries.
+        #
+        # Duration comes from the Director's plan, which is an intent expressed
+        # before the line was synthesized. With real TTS the actual read is often
+        # longer, and `-shortest` then cut the presenter off mid-sentence - the
+        # first scene of a promo ended on "spend 30" instead of "30 percent of
+        # every day". A small tail is added so the clip does not end on the final
+        # consonant.
+        dur = min(duration_s, 15.0)
+        speech_s = self._audio_duration_s(audio_path)
+        if speech_s:
+            dur = max(dur, min(speech_s + 0.4, 20.0))
 
         # Find scene performance spec if provided
         scene_spec = None
@@ -122,15 +172,23 @@ class DeterministicAvatarRenderer(BaseAvatarRenderer):
         char_ver = character_dna.version
 
         # High-definition video with showwaves visualizer, identity lock badge, and telemetry HUD
+        header_line = _ff_text(
+            f"{char_name.upper()} {char_ver} | SCENE 0{scene_no} [{role.upper()}] - {shot_type.upper()}", 80
+        )
+        emotion_line = _ff_text(f"EMOTION: {target_emotion.upper()} ({int(energy * 100)}%)", 40)
+
+        # NOTE on `ih` vs `H`: drawbox evaluates position expressions with its own
+        # constant set, which does not include H/W. Using H here parses on some
+        # builds and fails on FFmpeg 7, taking the entire filter graph down with it.
         filter_complex = (
             f"[1:a]showwaves=s=600x120:mode=line:colors=0x6366F1@0.8[wave];"
             f"[0:v][wave]overlay=x=(W-w)/2:y=H-180[v1];"
-            f"[v1]drawbox=y=H-120:color=black@0.7:width=iw:height=120:t=fill[v2];"
-            f"[v2]drawbox=x=40:y=40:width=280:height=40:color=0x6366F1@0.8:t=fill[v3];"
-            f"[v3]drawtext=text='AVATAROS IDENTITY LOCKED':fontcolor=white:fontsize=16:x=50:y=52[v4];"
-            f"[v4]drawtext=text='{char_name.upper()} {char_ver} | SCENE 0{scene_no} [{role.upper()}] - {shot_type.upper()}':fontcolor=0x38BDF8:fontsize=20:x=50:y=H-95[v5];"
-            f"[v5]drawtext=text='\"{safe_text}\"':fontcolor=white:fontsize=16:x=50:y=H-65[v6];"
-            f"[v6]drawtext=text='EMOTION: {target_emotion.upper()} ({int(energy*100)}%)':fontcolor=0xF59E0B:fontsize=16:x=W-300:y=52[vout]"
+            f"[v1]drawbox=y=ih-120:color=black@0.7:width=iw:height=120:t=fill[v2];"
+            f"[v2]drawbox=x=40:y=40:width=300:height=40:color=0x6366F1@0.8:t=fill[v3];"
+            f"[v3]drawtext=expansion=none:text='AVATAROS IDENTITY LOCKED':fontcolor=white:fontsize=16:x=52:y=52[v4];"
+            f"[v4]drawtext=expansion=none:text='{header_line}':fontcolor=0x38BDF8:fontsize=20:x=50:y=H-95[v5];"
+            f"[v5]drawtext=expansion=none:text='{safe_text}':fontcolor=white:fontsize=16:x=50:y=H-62[v6];"
+            f"[v6]drawtext=expansion=none:text='{emotion_line}':fontcolor=0xF59E0B:fontsize=16:x=W-320:y=52[vout]"
         )
 
         # Audio source input: use generated audio track if provided, else synthesize sine
@@ -152,9 +210,28 @@ class DeterministicAvatarRenderer(BaseAvatarRenderer):
         ]
 
         try:
-            subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=15)
-        except Exception:
-            # Fallback simple render if drawtext or filter syntax fails on minimal FFmpeg builds
+            subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=settings.MEDIA_SUBPROCESS_TIMEOUT)
+        except Exception as exc:
+            # Fallback for minimal FFmpeg builds without drawtext/freetype.
+            # Logged at ERROR with the actual ffmpeg stderr: the fallback produces a
+            # blank frame, which looks exactly like a successful render, so a silent
+            # except here hides a broken renderer completely.
+            detail = ""
+            if isinstance(exc, subprocess.CalledProcessError) and exc.stderr:
+                detail = exc.stderr.decode("utf-8", "replace").strip().splitlines()[-1:] or [""]
+                detail = detail[0][:400]
+            app_logger.log_operation(
+                trace_id=trace_id,
+                operation="scene_render_filter_failed",
+                status="ERROR",
+                agent_task="avatar_renderer",
+                details={
+                    "scene_no": scene_no,
+                    "error": str(exc)[:200],
+                    "ffmpeg_stderr": detail,
+                    "consequence": "falling back to a plain background render with no HUD overlay",
+                },
+            )
             fallback_cmd = [
                 self.ffmpeg_bin,
                 "-f", "lavfi", "-i", f"color=c={bg_color}:s={dim}:d={dur}",
@@ -163,7 +240,7 @@ class DeterministicAvatarRenderer(BaseAvatarRenderer):
                 "-c:a", "aac", "-shortest",
                 "-y", out_path
             ]
-            subprocess.run(fallback_cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=15)
+            subprocess.run(fallback_cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=settings.MEDIA_SUBPROCESS_TIMEOUT)
 
         # Compute SHA-256 and gather file facts
         file_size = os.path.getsize(out_path) if os.path.exists(out_path) else 0
@@ -227,7 +304,7 @@ class DeterministicAvatarRenderer(BaseAvatarRenderer):
             "-y", master_path
         ]
         try:
-            subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=20)
+            subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=settings.MEDIA_SUBPROCESS_TIMEOUT)
         finally:
             if os.path.exists(concat_list_path):
                 os.remove(concat_list_path)

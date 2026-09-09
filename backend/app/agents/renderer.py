@@ -1,6 +1,6 @@
 import os
 import hashlib
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 from backend.app.models.director import DirectorPlan
 from backend.app.models.performance import PerformancePlan, ProductionPerformancePlan
 from backend.app.models.dna import DigitalDNA
