@@ -29,63 +29,49 @@ def get_client():
         send_receive_timeout=settings.CLICKHOUSE_SEND_RECEIVE_TIMEOUT
     )
 
+def _split_sql_statements(sql_text: str) -> List[str]:
+    """
+    Splits a .sql file into executable statements, dropping comment-only chunks.
+
+    Comment lines are stripped before the emptiness check: the schema file
+    documents each table with a `--` block immediately above its CREATE, and a
+    naive `startswith("--")` test would classify the whole chunk as a comment and
+    silently skip the table.
+    """
+    statements = []
+    for chunk in sql_text.split(";"):
+        lines = [
+            line for line in chunk.splitlines()
+            if line.strip() and not line.strip().startswith("--")
+        ]
+        statement = "\n".join(lines).strip()
+        if statement:
+            statements.append(statement)
+    return statements
+
+
 def ensure_tables(client):
-    ddl_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "init_clickhouse.sql")
-    if os.path.exists(ddl_path):
-        with open(ddl_path, "r", encoding="utf-8") as f:
-            sql_content = f.read()
-        for statement in sql_content.split(";"):
-            clean_stmt = statement.strip()
-            if clean_stmt and not clean_stmt.startswith("--"):
-                client.command(clean_stmt)
-    else:
-        # Fallback DDL if file not found
-        client.command("""
-        CREATE TABLE IF NOT EXISTS scene_events (
-            event LowCardinality(String) DEFAULT 'scene_impression',
-            avatar_id LowCardinality(String),
-            character_version LowCardinality(String),
-            campaign_id String,
-            scene_id String,
-            language LowCardinality(String),
-            region LowCardinality(String),
-            platform LowCardinality(String),
-            hook_type LowCardinality(String),
-            opening_duration_s Float32,
-            emotion_target LowCardinality(String),
-            shot_preference LowCardinality(String) DEFAULT 'medium_shot',
-            watch_pct Float32,
-            ctr Float32,
-            conversion UInt8,
-            strategy_version UInt32 DEFAULT 13,
-            trace_id String DEFAULT '',
-            ts DateTime64(3, 'UTC')
-        ) ENGINE = MergeTree()
-        PARTITION BY toYYYYMM(ts)
-        ORDER BY (avatar_id, region, platform, hook_type, ts)
-        SETTINGS index_granularity = 8192;
-        """)
-        client.command("""
-        CREATE TABLE IF NOT EXISTS strategy_versions (
-            character_id LowCardinality(String),
-            strategy_version UInt32,
-            region LowCardinality(String),
-            audience LowCardinality(String),
-            platform LowCardinality(String),
-            hook_type LowCardinality(String),
-            opening_duration_min Float32,
-            opening_duration_max Float32,
-            shot_preference LowCardinality(String),
-            energy_bias Float32,
-            sample_size UInt32,
-            retention_lift Float32,
-            confidence String DEFAULT '',
-            source_query_id String,
-            trace_id String DEFAULT '',
-            applied_at DateTime64(3, 'UTC')
-        ) ENGINE = ReplacingMergeTree()
-        ORDER BY (character_id, strategy_version);
-        """)
+    """Applies the schema. Idempotent - every statement is CREATE IF NOT EXISTS."""
+    ddl_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "init_clickhouse.sql"
+    )
+    if not os.path.exists(ddl_path):
+        raise FileNotFoundError(
+            f"Schema file not found at {ddl_path}. It defines the telemetry, strategy "
+            "lineage and audit ledger tables and is required to seed."
+        )
+
+    with open(ddl_path, "r", encoding="utf-8") as f:
+        statements = _split_sql_statements(f.read())
+
+    if not statements:
+        raise ValueError(f"No executable statements parsed from {ddl_path}")
+
+    for statement in statements:
+        client.command(statement)
+
+    print(f"Applied {len(statements)} schema statements from init_clickhouse.sql")
+
 
 def generate_seed_events() -> List[List[Any]]:
     random.seed(42)
@@ -122,6 +108,43 @@ def generate_seed_events() -> List[List[Any]]:
                 f"trace_seed_{hook}_{i}",
                 ts
             ])
+
+    # ------------------------------------------------------------------
+    # Post-deployment cohort (strategy v14).
+    #
+    # The rows above are the v13 exploration period: all four hook types were
+    # served while the system was still learning. These rows are the period
+    # AFTER the Evolution Agent adopted the question hook, so the comparison
+    # between v13 and v14 is a real two-sample test over real rows rather than
+    # a stored lift figure. Distribution parameters are deliberately close to
+    # the v13 question-hook arm - the gain comes from concentrating traffic on
+    # the winning hook, not from an invented uplift.
+    # ------------------------------------------------------------------
+    v14_cfg = {"mean_watch": 0.726, "std": 0.078, "mean_ctr": 0.0503, "count": 640}
+    v14_start = base_time + timedelta(days=45)
+    for i in range(v14_cfg["count"]):
+        watch = max(0.1, min(0.99, random.gauss(v14_cfg["mean_watch"], v14_cfg["std"])))
+        ctr = max(0.005, min(0.15, random.gauss(v14_cfg["mean_ctr"], 0.01)))
+        rows.append([
+            "scene_impression",
+            "maya",
+            "1.7.0",
+            "titan_laptop_india_devs",
+            f"sc_titan_{i % 5 + 1}",
+            random.choice(["en", "hi"]),
+            "IN",
+            random.choice(["instagram_reel", "youtube_shorts", "linkedin"]),
+            "question",
+            float(round(random.uniform(6.0, 8.0), 2)),
+            "controlled_excitement",
+            "close_up",
+            float(round(watch, 4)),
+            float(round(ctr, 4)),
+            int(1 if (random.random() < (ctr * 0.4)) else 0),
+            14,
+            f"trace_seed_v14_{i}",
+            v14_start + timedelta(hours=i * 0.55),
+        ])
     return rows
 
 def seed_clickhouse(force: bool = False):
@@ -166,7 +189,7 @@ def seed_clickhouse(force: bool = False):
         print("Truncating scene_events table due to --force...")
         client.command("TRUNCATE TABLE scene_events")
 
-    print("Generating 1,842 benchmark telemetry events...")
+    print("Generating seeded demo telemetry (v13 exploration + v14 post-deployment cohort)...")
     rows = generate_seed_events()
     columns = [
         "event", "avatar_id", "character_version", "campaign_id", "scene_id",

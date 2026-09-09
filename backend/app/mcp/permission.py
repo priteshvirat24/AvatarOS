@@ -7,17 +7,31 @@ from backend.app.logging import app_logger
 # ---------------------------------------------------------------------------
 
 AGENT_MCP_ALLOWLIST: Dict[str, Set[str]] = {
+    # The Evolution Agent is the only identity permitted to reason over audience
+    # performance, because it is the only one whose output changes future strategy.
     "evolution_agent": {
         "query_scene_performance",
         "get_strategy_performance",
         "compare_strategy_versions",
         "get_recent_production_metrics",
-        "get_claim_verification_metrics"
+        "get_claim_verification_metrics",
+        "get_governance_summary"
     },
+    # The Director may look at scene-level pacing only - never at strategy or
+    # governance history.
     "director_agent": {
         "query_scene_performance"
     },
     "research_agent": {
+        "get_claim_verification_metrics"
+    },
+    # Read-only observability identity used by the MCP Trace panel and the
+    # governance forensics view. It can read ledgers and nothing else, so a
+    # compromised console cannot influence a production decision.
+    "governance_console": {
+        "get_mcp_call_ledger",
+        "get_governance_ledger",
+        "get_governance_summary",
         "get_claim_verification_metrics"
     },
     "script_agent": set(),

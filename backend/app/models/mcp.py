@@ -36,6 +36,13 @@ class MCPToolResult(BaseModel):
     latency_ms: float = 0.0
     error: Optional[str] = None
     server_identity: str = "clickhouse_mcp"
+    # Evidence fields - populated for real partner calls so the trace panel can show
+    # exactly what was executed rather than a summary of it.
+    call_id: Optional[str] = None
+    compiled_sql: Optional[str] = None
+    rows_returned: int = 0
+    transport: Optional[str] = None
+    is_simulated: bool = False
     timestamp: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 # ---------------------------------------------------------------------------
@@ -66,6 +73,20 @@ class RecentProductionMetricsQuery(BaseModel):
 
 class ClaimVerificationMetricsQuery(BaseModel):
     time_window_days: int = Field(default=30, ge=1, le=365)
+
+class MCPCallLedgerQuery(BaseModel):
+    """Reads the MCP call ledger back through the partner server itself."""
+    limit: int = Field(default=25, ge=1, le=500)
+    agent_identity: Optional[str] = None
+
+class GovernanceLedgerQuery(BaseModel):
+    """Reads immutable governance decisions (gate, rights, Guardian)."""
+    limit: int = Field(default=25, ge=1, le=500)
+    decision: Optional[str] = None
+
+class GovernanceSummaryQuery(BaseModel):
+    """Decision counts per pipeline stage."""
+    time_window_days: int = Field(default=90, ge=1, le=3650)
 
 # ---------------------------------------------------------------------------
 # STRATEGY DECISION TRACE (EVIDENCE PRESERVATION)
