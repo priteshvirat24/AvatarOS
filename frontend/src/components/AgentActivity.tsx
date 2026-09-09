@@ -4,6 +4,7 @@ import {
   ShieldCheck, FileSearch, Scale, Film, Sparkles, RefreshCw, UploadCloud, Play,
   Mic, User, Video, Layers, Check, ArrowRight, ShieldAlert, Cpu, Activity
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface AgentActivityProps {
   campaignData: any;
@@ -24,7 +25,7 @@ export const AgentActivity: React.FC<AgentActivityProps> = ({
   onReworkScene,
   isExecuting
 }) => {
-  const [expandedSection, setExpandedSection] = useState<string | null>('scorecard');
+  const [expandedSection, setExpandedSection] = useState<string | null>('timeline_stages');
 
   const toggleSection = (s: string) => {
     setExpandedSection(expandedSection === s ? null : s);
@@ -265,28 +266,37 @@ export const AgentActivity: React.FC<AgentActivityProps> = ({
                   const isRun = st.status === 'RUNNING';
                   const isBlk = st.status === 'BLOCKED' || st.status === 'FAILED';
                   return (
-                    <div key={st.event_id || st.id || idx} style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '3px',
-                      padding: '8px 10px',
-                      borderRadius: '4px',
-                      backgroundColor: 'var(--bg-darkest)',
-                      border: '1px solid var(--border-subtle)'
-                    }}>
+                    <motion.div
+                      key={st.event_id || st.id || idx}
+                      initial={{ opacity: 0, x: -6 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.2, delay: idx * 0.03 }}
+                      whileHover={{ x: 2 }}
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '3px',
+                        padding: '8px 10px',
+                        borderRadius: 'var(--radius-sm)',
+                        backgroundColor: isRun ? 'rgba(66, 133, 244, 0.08)' : 'var(--color-surface)',
+                        border: isRun ? '1px solid var(--color-primary)' : '1px solid var(--border-subtle)'
+                      }}
+                    >
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-muted)' }}>
                             0{idx + 1}
                           </span>
-                          <strong style={{ fontSize: '11px' }}>{st.stage || st.name}</strong>
+                          <strong style={{ fontSize: '11px', color: isRun ? 'var(--color-primary)' : 'inherit' }}>
+                            {st.stage || st.name}
+                          </strong>
                           {st.agent_name && (
                             <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>({st.agent_name})</span>
                           )}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           {st.duration_ms !== undefined && st.duration_ms > 0 && (
-                            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--accent-cyan)' }}>
+                            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--color-primary)' }}>
                               {st.duration_ms.toFixed(0)}ms
                             </span>
                           )}
@@ -294,7 +304,7 @@ export const AgentActivity: React.FC<AgentActivityProps> = ({
                             isComp ? 'badge-emerald' :
                             isRun ? 'badge-primary' :
                             isBlk ? 'badge-rose' : 'badge-secondary'
-                          }`} style={{ fontSize: '8.5px', padding: '1px 5px' }}>
+                          }`} style={{ fontSize: '8.5px', padding: '1px 6px' }}>
                             {st.status}
                           </span>
                         </div>
@@ -304,7 +314,7 @@ export const AgentActivity: React.FC<AgentActivityProps> = ({
                           {st.output_summary}
                         </p>
                       )}
-                    </div>
+                    </motion.div>
                   );
                 })}
               </div>

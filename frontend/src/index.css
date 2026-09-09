@@ -1,38 +1,78 @@
+/* ==========================================================================
+   Google DeepMind AvatarOS — Design System & Tokens
+   Adheres to @google/design.md specification
+   ========================================================================== */
+
 :root {
-  --bg-darkest: #07090E;
-  --bg-base: #0B0E17;
-  --bg-surface: #111625;
-  --bg-surface-elevated: #171E33;
-  --bg-glass: rgba(17, 22, 37, 0.75);
-  --border-subtle: rgba(255, 255, 255, 0.08);
-  --border-focus: rgba(99, 102, 241, 0.4);
-  --border-glow: rgba(99, 102, 241, 0.6);
+  /* Google Signature 4-Color Palette */
+  --google-blue: #4285F4;
+  --google-red: #EA4335;
+  --google-yellow: #FBBC04;
+  --google-green: #34A853;
 
-  --primary: #6366F1;
-  --primary-light: #818CF8;
-  --primary-dark: #4F46E5;
-  --primary-glow: rgba(99, 102, 241, 0.3);
+  /* Material Design 3 / Dark Theme Semantic Colors */
+  --color-primary: #8AB4F8;
+  --color-primary-container: #1A73E8;
+  --color-on-primary: #041E49;
+  --color-secondary: #81C995;
+  --color-tertiary: #FDD663;
+  --color-neutral: #E8EAED;
+  --color-error: #F28B82;
 
-  --accent-cyan: #38BDF8;
-  --accent-cyan-glow: rgba(56, 189, 248, 0.25);
-  --accent-emerald: #10B981;
-  --accent-emerald-glow: rgba(16, 185, 129, 0.25);
-  --accent-amber: #F59E0B;
-  --accent-rose: #F43F5E;
+  /* Background & Surface Foundations */
+  --color-background: #131314;
+  --color-surface: #1E1F22;
+  --color-surface-variant: #282A2C;
+  --color-surface-elevated: #303134;
+  --color-outline: #3C4043;
+  --color-outline-variant: #444746;
 
-  --text-primary: #F8FAFC;
-  --text-secondary: #94A3B8;
-  --text-muted: #64748B;
-  --text-dim: #475569;
+  /* Typography Stacks */
+  --font-display: 'Google Sans', 'Outfit', -apple-system, sans-serif;
+  --font-body: 'Roboto', 'Inter', -apple-system, sans-serif;
+  --font-mono: 'Roboto Mono', monospace;
 
-  --font-display: 'Outfit', -apple-system, sans-serif;
-  --font-body: 'Inter', -apple-system, sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  /* Spacing Scale (8pt grid) */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
 
+  /* Corner Radii */
+  --radius-xs: 4px;
   --radius-sm: 6px;
-  --radius-md: 10px;
+  --radius-md: 8px;
   --radius-lg: 16px;
   --radius-xl: 24px;
+  --radius-full: 9999px;
+
+  /* Backward Compatibility Aliases */
+  --bg-darkest: var(--color-background);
+  --bg-base: var(--color-background);
+  --bg-surface: var(--color-surface);
+  --bg-surface-elevated: var(--color-surface-elevated);
+  --bg-glass: rgba(30, 31, 34, 0.82);
+  --border-subtle: var(--color-outline);
+  --border-focus: var(--color-primary);
+  --border-glow: rgba(138, 180, 248, 0.45);
+
+  --primary: var(--color-primary-container);
+  --primary-light: var(--color-primary);
+  --primary-dark: #174EA6;
+  --primary-glow: rgba(66, 133, 244, 0.28);
+
+  --accent-cyan: #78D9EC;
+  --accent-cyan-glow: rgba(120, 217, 236, 0.25);
+  --accent-emerald: var(--color-secondary);
+  --accent-emerald-glow: rgba(129, 201, 149, 0.25);
+  --accent-amber: var(--color-tertiary);
+  --accent-rose: var(--color-error);
+
+  --text-primary: var(--color-neutral);
+  --text-secondary: #9AA0A6;
+  --text-muted: #80868B;
+  --text-dim: #5F6368;
 }
 
 * {
@@ -42,145 +82,212 @@
 }
 
 body {
-  background-color: var(--bg-darkest);
-  color: var(--text-primary);
+  background-color: var(--color-background);
+  color: var(--color-neutral);
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
   min-height: 100vh;
+  letter-spacing: 0.1px;
 }
 
-/* Custom Scrollbars */
+/* Official Google 4-Color Accent Line */
+.google-accent-line {
+  height: 3px;
+  width: 100%;
+  background: linear-gradient(90deg, 
+    var(--google-blue) 0%, 
+    var(--google-red) 25%, 
+    var(--google-yellow) 50%, 
+    var(--google-green) 75%, 
+    var(--google-blue) 100%
+  );
+  flex-shrink: 0;
+}
+
+/* Custom Google Chrome Style Scrollbars */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--bg-darkest);
+  background: var(--color-background);
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--bg-surface-elevated);
-  border-radius: 3px;
+  background: var(--color-surface-elevated);
+  border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--primary);
+  background: var(--color-outline);
 }
 
-/* Glassmorphic Container */
+/* Google Material Cards & Glass Panels */
 .glass-panel {
-  background: var(--bg-glass);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--border-subtle);
+  background: var(--color-surface);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--color-outline);
   border-radius: var(--radius-lg);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
 }
 
 .glass-panel-elevated {
-  background: var(--bg-surface-elevated);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-outline-variant);
   border-radius: var(--radius-lg);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
 }
 
-/* Glow Badges */
+/* Google Pill Chips & Badges */
 .badge-neon {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 3px 10px;
-  border-radius: 9999px;
+  padding: 3px 12px;
+  border-radius: var(--radius-full);
   font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
+  font-weight: 500;
+  font-family: var(--font-display);
+  letter-spacing: 0.2px;
 }
 
 .badge-primary {
-  background: rgba(99, 102, 241, 0.15);
-  color: var(--primary-light);
-  border: 1px solid rgba(99, 102, 241, 0.3);
+  background: rgba(66, 133, 244, 0.15);
+  color: var(--color-primary);
+  border: 1px solid rgba(66, 133, 244, 0.35);
 }
 
 .badge-emerald {
-  background: rgba(16, 185, 129, 0.15);
-  color: var(--accent-emerald);
-  border: 1px solid rgba(16, 185, 129, 0.3);
+  background: rgba(52, 168, 83, 0.15);
+  color: var(--color-secondary);
+  border: 1px solid rgba(52, 168, 83, 0.35);
 }
 
 .badge-amber {
-  background: rgba(245, 158, 11, 0.15);
-  color: var(--accent-amber);
-  border: 1px solid rgba(245, 158, 11, 0.3);
+  background: rgba(251, 188, 4, 0.15);
+  color: var(--color-tertiary);
+  border: 1px solid rgba(251, 188, 4, 0.35);
 }
 
 .badge-rose {
-  background: rgba(244, 63, 94, 0.15);
-  color: var(--accent-rose);
-  border: 1px solid rgba(244, 63, 94, 0.3);
+  background: rgba(234, 67, 53, 0.15);
+  color: var(--color-error);
+  border: 1px solid rgba(234, 67, 53, 0.35);
 }
 
 .badge-cyan {
-  background: rgba(56, 189, 248, 0.15);
+  background: rgba(120, 217, 236, 0.15);
   color: var(--accent-cyan);
-  border: 1px solid rgba(56, 189, 248, 0.3);
+  border: 1px solid rgba(120, 217, 236, 0.35);
 }
 
-/* Buttons */
+/* Google Material Buttons */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 8px 16px;
-  border-radius: var(--radius-md);
-  font-family: var(--font-body);
+  padding: 8px 18px;
+  border-radius: var(--radius-full);
+  font-family: var(--font-display);
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   border: 1px solid transparent;
   outline: none;
+  user-select: none;
+}
+
+.btn:active {
+  transform: scale(0.98);
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-  color: white;
-  box-shadow: 0 4px 14px var(--primary-glow);
+  background-color: var(--color-primary);
+  color: var(--color-on-primary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  font-weight: 600;
 }
 .btn-primary:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5);
+  background-color: #AECBFA;
+  box-shadow: 0 4px 12px rgba(66, 133, 244, 0.35);
 }
 
 .btn-secondary {
-  background: var(--bg-surface);
-  color: var(--text-primary);
-  border: 1px solid var(--border-subtle);
+  background: var(--color-surface-variant);
+  color: var(--color-neutral);
+  border: 1px solid var(--color-outline);
 }
 .btn-secondary:hover {
-  background: var(--bg-surface-elevated);
-  border-color: var(--border-focus);
+  background: var(--color-surface-elevated);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
 }
 
 .btn-danger {
-  background: rgba(244, 63, 94, 0.15);
-  color: var(--accent-rose);
-  border: 1px solid rgba(244, 63, 94, 0.4);
+  background: rgba(234, 67, 53, 0.15);
+  color: var(--color-error);
+  border: 1px solid rgba(234, 67, 53, 0.4);
 }
 .btn-danger:hover {
-  background: rgba(244, 63, 94, 0.25);
-  box-shadow: 0 0 12px rgba(244, 63, 94, 0.3);
+  background: rgba(234, 67, 53, 0.25);
+  box-shadow: 0 0 12px rgba(234, 67, 53, 0.3);
 }
 
 .btn-emerald {
-  background: linear-gradient(135deg, #10B981 0%, #059669 100%);
-  color: white;
-  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);
+  background-color: var(--color-secondary);
+  color: #0F5132;
+  font-weight: 600;
 }
 .btn-emerald:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.5);
+  background-color: #A8DAB5;
+  box-shadow: 0 4px 12px rgba(52, 168, 83, 0.35);
+}
+
+/* Google Search-Style Pill Prompt Bar */
+.google-prompt-bar {
+  background: var(--color-surface);
+  border: 1px solid var(--color-outline);
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  padding: 4px 6px 4px 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  transition: all 0.25s ease;
+}
+
+.google-prompt-bar:focus-within {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(138, 180, 248, 0.25), 0 4px 16px rgba(0, 0, 0, 0.35);
+  background: var(--color-surface-variant);
+}
+
+/* Google Analytics / Looker Studio KPI Cards */
+.metric-card-google {
+  background: var(--color-surface);
+  border: 1px solid var(--color-outline);
+  border-radius: var(--radius-lg);
+  padding: 16px 20px;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.metric-card-google:hover {
+  transform: translateY(-2px);
+  border-color: var(--color-primary);
+}
+
+.metric-card-google::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--google-blue);
 }
 
 /* Pulsing Status Dot */
@@ -192,8 +299,8 @@ body {
 }
 
 .status-dot.active {
-  background: var(--accent-emerald);
-  box-shadow: 0 0 8px var(--accent-emerald);
+  background: var(--color-secondary);
+  box-shadow: 0 0 8px var(--color-secondary);
 }
 
 .status-dot.active::after {
@@ -204,8 +311,8 @@ body {
   right: -2px;
   bottom: -2px;
   border-radius: 50%;
-  border: 1px solid var(--accent-emerald);
-  animation: pulse-ring 2s infinite;
+  border: 1px solid var(--color-secondary);
+  animation: pulse-ring 2.2s infinite;
 }
 
 @keyframes pulse-ring {
@@ -216,7 +323,8 @@ body {
 /* Typography styles */
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-display);
-  letter-spacing: -0.02em;
+  font-weight: 500;
+  letter-spacing: -0.01em;
 }
 
 .code-font {
@@ -230,17 +338,26 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .animate-fade-in {
-  animation: fadeIn 0.3s ease-out forwards;
+  animation: fadeIn 0.25s ease-out forwards;
 }
 
 @keyframes waveform {
-  0%, 100% { height: 6px; }
-  50% { height: 24px; }
+  0%, 100% { height: 4px; }
+  50% { height: 26px; }
 }
 
 .wave-bar {
   width: 3px;
-  background: var(--accent-cyan);
+  background: var(--color-primary);
   border-radius: 2px;
   animation: waveform 1.2s ease-in-out infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
 }

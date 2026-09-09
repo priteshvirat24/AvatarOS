@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import {
   Film, Sparkles, MessageSquare, Database, Terminal, Shield, RefreshCw,
-  Play, CheckCircle2, AlertTriangle, Layers, Dna, UploadCloud, BookOpen, Globe, Cloud
+  Play, CheckCircle2, AlertTriangle, Layers, Dna, UploadCloud, BookOpen, Globe, Cloud, Search
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 import { DigitalCast } from './components/DigitalCast';
 import { LiveStage } from './components/LiveStage';
@@ -223,44 +224,49 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100vw', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100vw', overflow: 'hidden', backgroundColor: 'var(--color-background)' }}>
+      {/* Official Google 4-Color Accent Line */}
+      <div className="google-accent-line" />
       
       {/* Top Navigation Bar */}
       <header style={{
         height: '56px',
         borderBottom: '1px solid var(--border-subtle)',
-        backgroundColor: 'var(--bg-darkest)',
+        backgroundColor: 'var(--color-surface)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '0 20px',
+        padding: '0 24px',
         flexShrink: 0
       }}>
         {/* Brand */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div style={{
-            width: '28px',
-            height: '28px',
-            borderRadius: '6px',
-            background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)',
+            width: '32px',
+            height: '32px',
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg, #4285F4 0%, #1A73E8 100%)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             color: 'white',
-            fontWeight: 900,
-            fontSize: '15px'
+            fontWeight: 800,
+            fontSize: '16px',
+            boxShadow: '0 2px 8px rgba(66, 133, 244, 0.4)'
           }}>
-            A
+            G
           </div>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <h1 style={{ fontSize: '15px', fontWeight: 900, letterSpacing: '0.5px' }}>
-                AVATAR<span style={{ color: 'var(--primary-light)' }}>OS</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h1 style={{ fontSize: '16px', fontWeight: 600, letterSpacing: '-0.2px', fontFamily: 'Google Sans, sans-serif' }}>
+                Avatar<span style={{ color: 'var(--color-primary)' }}>OS</span>
               </h1>
-              <span className="badge-neon badge-primary" style={{ fontSize: '9px', padding: '0 5px' }}>AUTONOMOUS STUDIO</span>
+              <span className="badge-neon badge-primary" style={{ fontSize: '9px', padding: '1px 8px' }}>
+                GOOGLE LABS
+              </span>
             </div>
-            <p style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
-              Create a digital actor once. Direct them forever.
+            <p style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>
+              Gemini 2.0 Autonomous Digital Human Studio
             </p>
           </div>
         </div>
@@ -268,9 +274,9 @@ export const App: React.FC = () => {
         {/* View Mode Switcher */}
         <div style={{
           display: 'flex',
-          backgroundColor: 'var(--bg-surface)',
+          backgroundColor: 'var(--color-background)',
           padding: '3px',
-          borderRadius: 'var(--radius-md)',
+          borderRadius: 'var(--radius-full)',
           border: '1px solid var(--border-subtle)',
           gap: '4px'
         }}>
@@ -278,10 +284,12 @@ export const App: React.FC = () => {
             className="btn"
             onClick={() => setViewMode('studio')}
             style={{
-              padding: '6px 14px',
+              padding: '6px 16px',
               fontSize: '12px',
-              backgroundColor: viewMode === 'studio' ? 'var(--primary)' : 'transparent',
-              color: viewMode === 'studio' ? 'white' : 'var(--text-muted)'
+              borderRadius: 'var(--radius-full)',
+              backgroundColor: viewMode === 'studio' ? 'var(--color-primary)' : 'transparent',
+              color: viewMode === 'studio' ? 'var(--color-on-primary)' : 'var(--text-muted)',
+              fontWeight: viewMode === 'studio' ? 600 : 500
             }}
           >
             <Film size={13} />
@@ -291,36 +299,42 @@ export const App: React.FC = () => {
             className="btn"
             onClick={() => setViewMode('live')}
             style={{
-              padding: '6px 14px',
+              padding: '6px 16px',
               fontSize: '12px',
-              backgroundColor: viewMode === 'live' ? 'var(--primary)' : 'transparent',
-              color: viewMode === 'live' ? 'white' : 'var(--text-muted)'
+              borderRadius: 'var(--radius-full)',
+              backgroundColor: viewMode === 'live' ? 'var(--color-primary)' : 'transparent',
+              color: viewMode === 'live' ? 'var(--color-on-primary)' : 'var(--text-muted)',
+              fontWeight: viewMode === 'live' ? 600 : 500
             }}
           >
             <MessageSquare size={13} />
-            Live Mode
+            Live Mode (Gemini)
           </button>
           <button
             className="btn"
             onClick={() => setViewMode('evolution')}
             style={{
-              padding: '6px 14px',
+              padding: '6px 16px',
               fontSize: '12px',
-              backgroundColor: viewMode === 'evolution' ? 'var(--primary)' : 'transparent',
-              color: viewMode === 'evolution' ? 'white' : 'var(--text-muted)'
+              borderRadius: 'var(--radius-full)',
+              backgroundColor: viewMode === 'evolution' ? 'var(--color-primary)' : 'transparent',
+              color: viewMode === 'evolution' ? 'var(--color-on-primary)' : 'var(--text-muted)',
+              fontWeight: viewMode === 'evolution' ? 600 : 500
             }}
           >
             <Database size={13} />
-            ClickHouse &amp; MCP
+            Analytics &amp; ClickHouse
           </button>
           <button
             className="btn"
             onClick={() => setViewMode('knowledge')}
             style={{
-              padding: '6px 14px',
+              padding: '6px 16px',
               fontSize: '12px',
-              backgroundColor: viewMode === 'knowledge' ? 'var(--primary)' : 'transparent',
-              color: viewMode === 'knowledge' ? 'white' : 'var(--text-muted)'
+              borderRadius: 'var(--radius-full)',
+              backgroundColor: viewMode === 'knowledge' ? 'var(--color-primary)' : 'transparent',
+              color: viewMode === 'knowledge' ? 'var(--color-on-primary)' : 'var(--text-muted)',
+              fontWeight: viewMode === 'knowledge' ? 600 : 500
             }}
           >
             <BookOpen size={13} />
@@ -332,81 +346,41 @@ export const App: React.FC = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '11px' }}>
           <button
             className="btn btn-secondary"
-            style={{ padding: '4px 8px', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '4px', borderColor: 'rgba(99, 102, 241, 0.4)', color: 'var(--primary-light)' }}
+            style={{ padding: '5px 12px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '6px', borderRadius: 'var(--radius-full)' }}
             onClick={() => setShowProviderMatrixModal(true)}
           >
-            <Cloud size={12} />
-            Providers &amp; Cloud (11/11)
+            <Cloud size={13} color="var(--color-primary)" />
+            Google Cloud (11/11 Active)
           </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <div className="status-dot active" />
-            <span style={{ color: 'var(--text-secondary)' }}>{currentCharacter.name} {currentCharacter.version} (DNA Locked)</span>
+            <span style={{ color: 'var(--text-secondary)' }}>{currentCharacter.name} {currentCharacter.version} (DNA Sealed)</span>
           </div>
           <button
             className="btn btn-secondary"
-            style={{ padding: '4px 8px', fontSize: '10px' }}
+            style={{ padding: '5px 12px', fontSize: '11px', borderRadius: 'var(--radius-full)' }}
             onClick={() => setDnaModalCharId(selectedCharacterId)}
           >
-            <Dna size={12} />
+            <Dna size={13} color="var(--color-primary)" />
             DNA Inspector
           </button>
         </div>
       </header>
 
-      {/* Section 3: Single-Action Production Creation Bar */}
+      {/* Google Search-Style Production Creation Bar */}
       {viewMode === 'studio' && (
         <div style={{
-          padding: '10px 20px',
-          backgroundColor: 'var(--bg-base)',
+          padding: '12px 24px',
+          backgroundColor: 'var(--color-background)',
           borderBottom: '1px solid var(--border-subtle)',
           display: 'flex',
           alignItems: 'center',
           gap: '12px'
         }}>
-          {/* Language Selector */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <Globe size={13} color="var(--primary-light)" />
-            <select
-              value={selectedLanguage}
-              onChange={(e) => setSelectedLanguage(e.target.value as 'en' | 'hi')}
-              style={{
-                backgroundColor: 'var(--bg-surface)',
-                border: '1px solid var(--border-subtle)',
-                borderRadius: 'var(--radius-sm)',
-                padding: '5px 8px',
-                color: 'white',
-                fontSize: '11px',
-                outline: 'none'
-              }}
-            >
-              <option value="en">English (EN)</option>
-              <option value="hi">Hindi (HI)</option>
-            </select>
-          </div>
-
-          {/* Register Selector */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <select
-              value={selectedRegister}
-              onChange={(e) => setSelectedRegister(e.target.value)}
-              style={{
-                backgroundColor: 'var(--bg-surface)',
-                border: '1px solid var(--border-subtle)',
-                borderRadius: 'var(--radius-sm)',
-                padding: '5px 8px',
-                color: 'white',
-                fontSize: '11px',
-                outline: 'none'
-              }}
-            >
-              <option value="technical">Register: Technical</option>
-              <option value="conversational">Register: Conversational</option>
-              <option value="executive">Register: Executive</option>
-            </select>
-          </div>
-
-          {/* Input Brief */}
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', position: 'relative' }}>
+          {/* Main Prompt Bar Container */}
+          <div className="google-prompt-bar" style={{ flex: 1 }}>
+            <Sparkles size={16} color="var(--google-blue)" style={{ marginRight: '8px', flexShrink: 0 }} />
+            
             <input
               type="text"
               value={commandInput}
@@ -414,15 +388,57 @@ export const App: React.FC = () => {
               placeholder="Enter production brief (character, goal, audience, language)..."
               style={{
                 width: '100%',
-                backgroundColor: 'var(--bg-surface)',
-                border: '1px solid var(--border-subtle)',
-                borderRadius: 'var(--radius-sm)',
-                padding: '7px 12px',
-                color: 'white',
-                fontSize: '12px',
-                outline: 'none'
+                backgroundColor: 'transparent',
+                border: 'none',
+                color: 'var(--color-neutral)',
+                fontSize: '13px',
+                outline: 'none',
+                fontFamily: 'Roboto, sans-serif'
               }}
             />
+
+            {/* Language & Register Controls Embedded */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingRight: '4px', flexShrink: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Globe size={13} color="var(--color-primary)" />
+                <select
+                  value={selectedLanguage}
+                  onChange={(e) => setSelectedLanguage(e.target.value as 'en' | 'hi')}
+                  style={{
+                    backgroundColor: 'var(--color-surface-elevated)',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: 'var(--radius-full)',
+                    padding: '4px 8px',
+                    color: 'var(--color-neutral)',
+                    fontSize: '11px',
+                    outline: 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <option value="en">EN (Indian)</option>
+                  <option value="hi">HI (Hindi)</option>
+                </select>
+              </div>
+
+              <select
+                value={selectedRegister}
+                onChange={(e) => setSelectedRegister(e.target.value)}
+                style={{
+                  backgroundColor: 'var(--color-surface-elevated)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: 'var(--radius-full)',
+                  padding: '4px 8px',
+                  color: 'var(--color-neutral)',
+                  fontSize: '11px',
+                  outline: 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                <option value="technical">Register: Technical</option>
+                <option value="conversational">Register: Conversational</option>
+                <option value="executive">Register: Executive</option>
+              </select>
+            </div>
           </div>
 
           {/* CREATE PRODUCTION Action Button */}
@@ -430,7 +446,7 @@ export const App: React.FC = () => {
             className="btn btn-primary"
             onClick={() => runProduction({})}
             disabled={isExecuting}
-            style={{ padding: '7px 18px', fontSize: '12px', fontWeight: 700 }}
+            style={{ padding: '8px 22px', fontSize: '13px', fontWeight: 600, flexShrink: 0 }}
           >
             {isExecuting ? <RefreshCw size={14} className="animate-spin" /> : <Sparkles size={14} />}
             CREATE PRODUCTION
@@ -438,54 +454,90 @@ export const App: React.FC = () => {
         </div>
       )}
 
-      {/* Main Workspace Body */}
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-        {viewMode === 'studio' && (
-          <>
-            <DigitalCast
-              cast={cast}
-              selectedId={selectedCharacterId}
-              onSelect={setSelectedCharacterId}
-              onOpenCompiler={() => setShowCompilerModal(true)}
-              onOpenDnaModal={(id) => setDnaModalCharId(id)}
-            />
+      {/* Main Workspace Body with Framer Motion transitions */}
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
+        <AnimatePresence mode="wait">
+          {viewMode === 'studio' && (
+            <motion.div
+              key="studio"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.2 }}
+              style={{ flex: 1, display: 'flex', overflow: 'hidden' }}
+            >
+              <DigitalCast
+                cast={cast}
+                selectedId={selectedCharacterId}
+                onSelect={setSelectedCharacterId}
+                onOpenCompiler={() => setShowCompilerModal(true)}
+                onOpenDnaModal={(id) => setDnaModalCharId(id)}
+              />
 
-            <LiveStage
-              videoUrl={campaignData?.master_video_url || "/media/master_video_en.mp4"}
-              hindiVideoUrl={campaignData?.hindi_production?.video_url}
-              characterName={currentCharacter.name}
-              characterVersion={currentCharacter.version}
-              activeSceneNo={activeSceneNo}
-              targetEmotion={activeShot.target_emotion}
-              energy={activeShot.emotional_intensity}
-              c2paManifestHash={campaignData?.publish_result?.provenance?.c2pa_manifest_hash}
-              mediaSha256={campaignData?.media_sha256}
-              repurposedClips={campaignData?.repurposed_clips}
-            />
+              <LiveStage
+                videoUrl={campaignData?.master_video_url || "/media/master_video_en.mp4"}
+                hindiVideoUrl={campaignData?.hindi_production?.video_url}
+                characterName={currentCharacter.name}
+                characterVersion={currentCharacter.version}
+                activeSceneNo={activeSceneNo}
+                targetEmotion={activeShot.target_emotion}
+                energy={activeShot.emotional_intensity}
+                c2paManifestHash={campaignData?.publish_result?.provenance?.c2pa_manifest_hash}
+                mediaSha256={campaignData?.media_sha256}
+                repurposedClips={campaignData?.repurposed_clips}
+              />
 
-            <AgentActivity
-              campaignData={campaignData}
-              onTriggerClaimFailure={handleDemoClaimBlock}
-              onResolveClaim={handleResolveClaim}
-              onTriggerEmotionFailure={handleDemoGuardianFailure}
-              onTriggerRightsFailure={handleDemoRightsBlock}
-              onReworkScene={handleReworkScene}
-              isExecuting={isExecuting}
-            />
-          </>
-        )}
+              <AgentActivity
+                campaignData={campaignData}
+                onTriggerClaimFailure={handleDemoClaimBlock}
+                onResolveClaim={handleResolveClaim}
+                onTriggerEmotionFailure={handleDemoGuardianFailure}
+                onTriggerRightsFailure={handleDemoRightsBlock}
+                onReworkScene={handleReworkScene}
+                isExecuting={isExecuting}
+              />
+            </motion.div>
+          )}
 
-        {viewMode === 'live' && (
-          <LiveModeChat onHandoffToStudio={handleLiveHandoffToStudio} />
-        )}
+          {viewMode === 'live' && (
+            <motion.div
+              key="live"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.2 }}
+              style={{ flex: 1, display: 'flex', overflow: 'hidden' }}
+            >
+              <LiveModeChat onHandoffToStudio={handleLiveHandoffToStudio} />
+            </motion.div>
+          )}
 
-        {viewMode === 'evolution' && (
-          <ClickHouseEvolution />
-        )}
+          {viewMode === 'evolution' && (
+            <motion.div
+              key="evolution"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.2 }}
+              style={{ flex: 1, display: 'flex', overflow: 'hidden' }}
+            >
+              <ClickHouseEvolution />
+            </motion.div>
+          )}
 
-        {viewMode === 'knowledge' && (
-          <KnowledgeRetrieval />
-        )}
+          {viewMode === 'knowledge' && (
+            <motion.div
+              key="knowledge"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.2 }}
+              style={{ flex: 1, display: 'flex', overflow: 'hidden' }}
+            >
+              <KnowledgeRetrieval />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Bottom Production Timeline (Only in Studio Mode) */}
