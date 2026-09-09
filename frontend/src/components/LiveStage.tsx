@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Play, Pause, RotateCcw, Volume2, Shield, Eye, Layers, Film, FileCode2, Sparkles, CheckCircle2, User, Activity, Video, Cpu, Box } from 'lucide-react';
+import { Play, Pause, RotateCcw, Volume2, Shield, Eye, Layers, Film, FileCode2, Sparkles, CheckCircle2, User, Activity, Video, Cpu, Box, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GoogleLabs3D } from './GoogleLabs3D';
 
@@ -18,6 +18,9 @@ interface LiveStageProps {
   stageStatus?: 'IDLE' | 'PREPARING' | 'SPEAKING' | 'VERIFYING' | 'APPROVED' | 'BLOCKED';
   rendererProvider?: string;
   voiceProvider?: string;
+  showCast?: boolean;
+  onToggleCast?: () => void;
+  castCount?: number;
 }
 
 export const LiveStage: React.FC<LiveStageProps> = ({
@@ -34,7 +37,10 @@ export const LiveStage: React.FC<LiveStageProps> = ({
   isExecuting = false,
   stageStatus = "APPROVED",
   rendererProvider = "Deterministic Engine (FFmpeg)",
-  voiceProvider = "Deterministic Acoustic Synthesizer"
+  voiceProvider = "Deterministic Acoustic Synthesizer",
+  showCast = false,
+  onToggleCast,
+  castCount = 4
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentLang, setCurrentLang] = useState<'en' | 'hi'>('en');
@@ -141,15 +147,39 @@ export const LiveStage: React.FC<LiveStageProps> = ({
     }}>
       {/* Top Bar for Stage */}
       <div style={{
-        padding: '12px 20px',
+        padding: '10px 18px',
         borderBottom: '1px solid var(--border-subtle)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        backgroundColor: 'var(--bg-base)'
+        backgroundColor: 'var(--bg-base)',
+        gap: '10px'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{ fontSize: '12px', fontWeight: 800, letterSpacing: '1px', color: 'var(--text-secondary)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flexShrink: 0 }}>
+          {onToggleCast && !showCast && (
+            <button
+              onClick={onToggleCast}
+              className="btn btn-secondary"
+              style={{
+                padding: '3px 10px',
+                fontSize: '11px',
+                borderRadius: 'var(--radius-full)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                border: '1px solid var(--border-subtle)',
+                backgroundColor: 'var(--color-surface)',
+                color: 'var(--text-secondary)'
+              }}
+              title="Open Digital Cast Panel"
+            >
+              <User size={12} color="var(--google-blue)" />
+              <span>Cast ({castCount})</span>
+              <ChevronRight size={11} />
+            </button>
+          )}
+
+          <span style={{ fontSize: '11.5px', fontWeight: 800, letterSpacing: '0.8px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
             DIGITAL HUMAN PERFORMANCE
           </span>
           {/* Transition Status Badge */}
@@ -158,71 +188,80 @@ export const LiveStage: React.FC<LiveStageProps> = ({
             currentStageStatus === 'SPEAKING' ? 'badge-primary' :
             currentStageStatus === 'PREPARING' ? 'badge-cyan' :
             currentStageStatus === 'VERIFYING' ? 'badge-amber' : 'badge-rose'
-          }`} style={{ fontSize: '10px' }}>
+          }`} style={{ fontSize: '9.5px', whiteSpace: 'nowrap' }}>
             STATUS: {currentStageStatus}
           </span>
-          <span className="badge-neon badge-secondary" style={{ fontSize: '9px' }}>
-            RENDERER: {rendererProvider}
+          <span className="badge-neon badge-secondary" style={{ fontSize: '9px', whiteSpace: 'nowrap' }}>
+            FFmpeg
           </span>
         </div>
 
-        {/* View Switcher Tabs */}
+        {/* View Switcher Tabs (Compact, fits all viewports) */}
         <div style={{
           display: 'flex',
           backgroundColor: 'var(--color-surface)',
-          padding: '3px',
+          padding: '2px',
           borderRadius: 'var(--radius-full)',
           border: '1px solid var(--border-subtle)',
-          gap: '4px'
+          gap: '2px',
+          flexShrink: 0
         }}>
           <button
             className="btn"
             onClick={() => { setActiveTab('video'); setSelectedRepurposedUrl(null); }}
             style={{
-              padding: '4px 12px',
+              padding: '4px 10px',
               fontSize: '11px',
+              borderRadius: 'var(--radius-full)',
               backgroundColor: activeTab === 'video' ? 'var(--color-primary)' : 'transparent',
               color: activeTab === 'video' ? 'var(--color-on-primary)' : 'var(--text-muted)'
             }}
+            title="Master Video"
           >
             <Film size={12} />
-            Master Video
+            Video
           </button>
           <button
             className="btn"
             onClick={() => setActiveTab('3d_neural_core')}
             style={{
-              padding: '4px 12px',
+              padding: '4px 10px',
               fontSize: '11px',
+              borderRadius: 'var(--radius-full)',
               backgroundColor: activeTab === '3d_neural_core' ? 'var(--color-primary)' : 'transparent',
               color: activeTab === '3d_neural_core' ? 'var(--color-on-primary)' : 'var(--text-muted)'
             }}
+            title="3D Biometric Neural Core"
           >
             <Cpu size={12} />
-            3D Neural Core
+            3D Core
           </button>
           <button
             className="btn"
             onClick={() => setActiveTab('performance_preview')}
             style={{
-              padding: '4px 12px',
+              padding: '4px 10px',
               fontSize: '11px',
+              borderRadius: 'var(--radius-full)',
               backgroundColor: activeTab === 'performance_preview' ? 'var(--color-primary)' : 'transparent',
               color: activeTab === 'performance_preview' ? 'var(--color-on-primary)' : 'var(--text-muted)'
             }}
+            title="Performance Plan"
           >
             <Activity size={12} />
-            Performance Plan
+            Plan
           </button>
           <button
             className="btn"
             onClick={() => setActiveTab('storyboard')}
             style={{
-              padding: '4px 12px',
+              padding: '4px 10px',
               fontSize: '11px',
+              borderRadius: 'var(--radius-full)',
               backgroundColor: activeTab === 'storyboard' ? 'var(--color-primary)' : 'transparent',
               color: activeTab === 'storyboard' ? 'var(--color-on-primary)' : 'var(--text-muted)'
             }}
+            title="Multi-Scene Storyboard"
           >
             <Layers size={12} />
             Storyboard
@@ -231,11 +270,13 @@ export const LiveStage: React.FC<LiveStageProps> = ({
             className="btn"
             onClick={() => setActiveTab('repurposed')}
             style={{
-              padding: '4px 12px',
+              padding: '4px 10px',
               fontSize: '11px',
+              borderRadius: 'var(--radius-full)',
               backgroundColor: activeTab === 'repurposed' ? 'var(--color-primary)' : 'transparent',
               color: activeTab === 'repurposed' ? 'var(--color-on-primary)' : 'var(--text-muted)'
             }}
+            title="Omnichannel Vertical Shorts"
           >
             <Sparkles size={12} />
             Shorts ({repurposedClips.length || 3})
@@ -244,14 +285,16 @@ export const LiveStage: React.FC<LiveStageProps> = ({
             className="btn"
             onClick={() => setActiveTab('c2pa')}
             style={{
-              padding: '4px 12px',
+              padding: '4px 10px',
               fontSize: '11px',
+              borderRadius: 'var(--radius-full)',
               backgroundColor: activeTab === 'c2pa' ? 'var(--color-primary)' : 'transparent',
               color: activeTab === 'c2pa' ? 'var(--color-on-primary)' : 'var(--text-muted)'
             }}
+            title="C2PA Cryptographic Provenance Manifest"
           >
             <Shield size={12} />
-            C2PA Provenance
+            C2PA
           </button>
         </div>
 

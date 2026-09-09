@@ -44,6 +44,7 @@ export const App: React.FC = () => {
   // Collapsible drawers (collapsed by default for ultra-clean look)
   const [showCast, setShowCast] = useState(false);
   const [showTimeline, setShowTimeline] = useState(false);
+  const [showDemoGuide, setShowDemoGuide] = useState(false);
 
   const navigateTo = (page: 'home' | 'studio' | 'live' | 'evolution' | 'knowledge') => {
     setViewMode(page);
@@ -419,6 +420,25 @@ export const App: React.FC = () => {
             DNA Inspector
           </button>
           <button
+            className="btn btn-secondary"
+            style={{
+              padding: '5px 12px',
+              fontSize: '11px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              borderRadius: 'var(--radius-full)',
+              border: showDemoGuide ? '1px solid var(--google-blue)' : '1px solid var(--border-subtle)',
+              backgroundColor: showDemoGuide ? 'rgba(26, 115, 232, 0.08)' : 'var(--color-surface)',
+              color: showDemoGuide ? 'var(--google-blue)' : 'var(--text-secondary)'
+            }}
+            onClick={() => setShowDemoGuide(!showDemoGuide)}
+            title="9-Step Autonomous Demo Walkthrough"
+          >
+            <Sparkles size={12} color={showDemoGuide ? "var(--google-blue)" : "var(--color-primary)"} />
+            <span>9-Step Demo</span>
+          </button>
+          <button
             className="btn judge-mode-btn"
             style={{
               padding: '6px 14px',
@@ -650,46 +670,6 @@ export const App: React.FC = () => {
                 )}
               </AnimatePresence>
 
-              {/* Floating Edge Toggle when Cast is collapsed */}
-              {!showCast && (
-                <button
-                  onClick={() => setShowCast(true)}
-                  style={{
-                    position: 'absolute',
-                    top: '16px',
-                    left: '16px',
-                    zIndex: 25,
-                    backgroundColor: 'var(--color-surface-elevated)',
-                    border: '1px solid var(--border-subtle)',
-                    borderRadius: 'var(--radius-full)',
-                    padding: '6px 14px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    color: 'var(--text-secondary)',
-                    boxShadow: '0 2px 10px rgba(0,0,0,0.08)',
-                    cursor: 'pointer',
-                    backdropFilter: 'blur(8px)',
-                    transition: 'all 0.2s ease'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = 'var(--google-blue)';
-                    e.currentTarget.style.color = 'var(--google-blue)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = 'var(--border-subtle)';
-                    e.currentTarget.style.color = 'var(--text-secondary)';
-                  }}
-                  title="Open Digital Cast Panel"
-                >
-                  <Users size={14} color="var(--google-blue)" />
-                  <span>Cast ({cast.length || 4})</span>
-                  <ChevronRight size={13} />
-                </button>
-              )}
-
               <LiveStage
                 videoUrl={campaignData?.master_video_url || "/media/master_video_en.mp4"}
                 hindiVideoUrl={campaignData?.hindi_production?.video_url}
@@ -701,6 +681,9 @@ export const App: React.FC = () => {
                 c2paManifestHash={campaignData?.publish_result?.provenance?.c2pa_manifest_hash}
                 mediaSha256={campaignData?.media_sha256}
                 repurposedClips={campaignData?.repurposed_clips}
+                showCast={showCast}
+                onToggleCast={() => setShowCast(!showCast)}
+                castCount={cast.length || 4}
               />
 
               <AgentActivity
@@ -712,52 +695,6 @@ export const App: React.FC = () => {
                 onReworkScene={handleReworkScene}
                 isExecuting={isExecuting}
               />
-
-              {/* Floating Bottom Timeline Toggle when collapsed */}
-              {!showTimeline && (
-                <div style={{
-                  position: 'absolute',
-                  bottom: '16px',
-                  left: '50%',
-                  transform: 'translateX(-50%)',
-                  zIndex: 25
-                }}>
-                  <button
-                    onClick={() => setShowTimeline(true)}
-                    style={{
-                      backgroundColor: 'var(--color-surface-elevated)',
-                      border: '1px solid var(--border-subtle)',
-                      borderRadius: 'var(--radius-full)',
-                      padding: '7px 18px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      color: 'var(--text-secondary)',
-                      boxShadow: '0 4px 14px rgba(0,0,0,0.1)',
-                      cursor: 'pointer',
-                      backdropFilter: 'blur(8px)',
-                      transition: 'all 0.2s ease'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = 'var(--google-blue)';
-                      e.currentTarget.style.color = 'var(--google-blue)';
-                      e.currentTarget.style.boxShadow = '0 4px 16px rgba(26, 115, 232, 0.2)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.borderColor = 'var(--border-subtle)';
-                      e.currentTarget.style.color = 'var(--text-secondary)';
-                      e.currentTarget.style.boxShadow = '0 4px 14px rgba(0,0,0,0.1)';
-                    }}
-                    title="Open Production Timeline"
-                  >
-                    <Film size={14} color="var(--google-blue)" />
-                    <span>Timeline ({campaignData?.director_plan?.shots?.length || 5} Scenes)</span>
-                    <ChevronUp size={13} />
-                  </button>
-                </div>
-              )}
             </motion.div>
           )}
 
@@ -802,33 +739,74 @@ export const App: React.FC = () => {
         </AnimatePresence>
       </div>
 
-      {/* Bottom Production Timeline (Only in Studio Mode, toggled on request) */}
+      {/* Bottom Production Timeline Dock Bar (Only in Studio Mode) */}
       {viewMode === 'studio' && (
-        <AnimatePresence>
-          {showTimeline && (
-            <motion.div
-              key="studio-timeline-footer"
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.25, ease: [0.2, 0, 0, 1] }}
-              style={{ overflow: 'hidden', flexShrink: 0 }}
+        <>
+          <AnimatePresence>
+            {showTimeline && (
+              <motion.div
+                key="studio-timeline-footer"
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.25, ease: [0.2, 0, 0, 1] }}
+                style={{ overflow: 'hidden', flexShrink: 0 }}
+              >
+                <ProductionTimeline
+                  shots={campaignData?.director_plan?.shots || []}
+                  activeSceneNo={activeSceneNo}
+                  onSelectScene={setActiveSceneNo}
+                  failedScenes={campaignData?.guardian_report?.failed_scenes}
+                  isBlocked={campaignData?.publish_result?.status === 'BLOCKED'}
+                  onClose={() => setShowTimeline(false)}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {!showTimeline && (
+            <div
+              onClick={() => setShowTimeline(true)}
+              style={{
+                height: '28px',
+                borderTop: '1px solid var(--border-subtle)',
+                backgroundColor: 'var(--color-surface)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                flexShrink: 0,
+                zIndex: 10
+              }}
+              title="Expand Production Timeline"
             >
-              <ProductionTimeline
-                shots={campaignData?.director_plan?.shots || []}
-                activeSceneNo={activeSceneNo}
-                onSelectScene={setActiveSceneNo}
-                failedScenes={campaignData?.guardian_report?.failed_scenes}
-                isBlocked={campaignData?.publish_result?.status === 'BLOCKED'}
-                onClose={() => setShowTimeline(false)}
-              />
-            </motion.div>
+              <button
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  color: 'var(--text-secondary)',
+                  cursor: 'pointer'
+                }}
+              >
+                <Film size={12} color="var(--google-blue)" />
+                <span>Production Timeline ({campaignData?.director_plan?.shots?.length || 5} Scenes)</span>
+                <ChevronUp size={12} />
+              </button>
+            </div>
           )}
-        </AnimatePresence>
+        </>
       )}
 
-      {/* Floating 9-Step Demo Walkthrough Guide */}
+      {/* Floating 9-Step Demo Walkthrough Guide (Toggled on demand from top navbar) */}
       <DemoGuide
+        isOpen={showDemoGuide}
+        onClose={() => setShowDemoGuide(false)}
         currentStep={demoStep}
         onSelectStep={(step) => {
           setDemoStep(step);
