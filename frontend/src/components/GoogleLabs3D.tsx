@@ -42,22 +42,22 @@ export const GoogleLabs3D: React.FC<GoogleLabs3DProps> = ({
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     container.appendChild(renderer.domElement);
 
-    // Google Signature Colors Palette for Shaders / Particles
+    // Google Signature Colors Palette for Shaders / Particles (Light Theme Contrast)
     const googleColors = [
-      new THREE.Color('#4285F4'), // Google Blue
-      new THREE.Color('#EA4335'), // Google Red
-      new THREE.Color('#FBBC04'), // Google Yellow
-      new THREE.Color('#34A853'), // Google Green
-      new THREE.Color('#8AB4F8'), // Light Blue
+      new THREE.Color('#1A73E8'), // Google Blue
+      new THREE.Color('#D93025'), // Google Red
+      new THREE.Color('#B06000'), // Google Yellow / Amber
+      new THREE.Color('#137333'), // Google Green
+      new THREE.Color('#007B83'), // Google Teal / Cyan
     ];
 
     // 1. Central Icosahedron Wireframe (Neural Core)
     const icoGeometry = new THREE.IcosahedronGeometry(1.35, 2);
     const icoMaterial = new THREE.MeshBasicMaterial({
-      color: 0x8ab4f8,
+      color: 0x1a73e8,
       wireframe: true,
       transparent: true,
-      opacity: 0.35,
+      opacity: 0.45,
     });
     const icoMesh = new THREE.Mesh(icoGeometry, icoMaterial);
     scene.add(icoMesh);
@@ -65,10 +65,10 @@ export const GoogleLabs3D: React.FC<GoogleLabs3DProps> = ({
     // 2. Inner Glowing Core Sphere
     const innerGeo = new THREE.SphereGeometry(0.85, 32, 32);
     const innerMat = new THREE.MeshBasicMaterial({
-      color: 0x1a73e8,
+      color: 0x4285f4,
       wireframe: true,
       transparent: true,
-      opacity: 0.2,
+      opacity: 0.3,
     });
     const innerCore = new THREE.Mesh(innerGeo, innerMat);
     scene.add(innerCore);
@@ -118,7 +118,7 @@ export const GoogleLabs3D: React.FC<GoogleLabs3DProps> = ({
     const particleSystem = new THREE.Points(particleGeo, particleMat);
     scene.add(particleSystem);
 
-    // 4. Orbiting Rings (Google Labs Gyroscopic Axis)
+    // 4. Orbiting Rings (Avatar Gyroscopic Axis)
     const ringGeo1 = new THREE.TorusGeometry(2.3, 0.008, 16, 100);
     const ringMat1 = new THREE.MeshBasicMaterial({ color: 0x4285f4, transparent: true, opacity: 0.4 });
     const ring1 = new THREE.Mesh(ringGeo1, ringMat1);
@@ -256,10 +256,11 @@ export const GoogleLabs3D: React.FC<GoogleLabs3DProps> = ({
         position: 'relative',
         width: '100%',
         height: height,
-        backgroundColor: '#131314',
+        backgroundColor: '#FFFFFF',
         borderRadius: '16px',
         overflow: 'hidden',
-        border: '1px solid #3C4043',
+        border: '1px solid #DADCE0',
+        boxShadow: '0 1px 3px rgba(60,64,67,0.12)',
         display: 'flex',
         flexDirection: 'column',
       }}
@@ -269,7 +270,7 @@ export const GoogleLabs3D: React.FC<GoogleLabs3DProps> = ({
       {/* 3D WebGL Canvas Container */}
       <div ref={mountRef} style={{ width: '100%', height: '100%', flex: 1, cursor: 'grab' }} />
 
-      {/* Google Labs HUD Overlays */}
+      {/* Avatar Core HUD Overlays */}
       <div
         style={{
           position: 'absolute',
@@ -287,31 +288,32 @@ export const GoogleLabs3D: React.FC<GoogleLabs3DProps> = ({
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              backgroundColor: 'rgba(30, 31, 34, 0.85)',
+              backgroundColor: 'rgba(255, 255, 255, 0.95)',
               backdropFilter: 'blur(12px)',
               padding: '4px 12px',
               borderRadius: '9999px',
-              border: '1px solid #3C4043',
+              border: '1px solid #DADCE0',
+              boxShadow: '0 1px 3px rgba(60,64,67,0.15)',
             }}
           >
             <span
               style={{
-                width: '7px',
-                height: '7px',
+                width: '8px',
+                height: '8px',
                 borderRadius: '50%',
-                backgroundColor: isSpeaking ? '#EA4335' : isListening ? '#FBBC04' : '#34A853',
-                boxShadow: `0 0 8px ${isSpeaking ? '#EA4335' : isListening ? '#FBBC04' : '#34A853'}`,
+                backgroundColor: isSpeaking ? '#D93025' : isListening ? '#B06000' : '#137333',
+                boxShadow: `0 0 6px ${isSpeaking ? '#D93025' : isListening ? '#B06000' : '#137333'}`,
               }}
             />
-            <span style={{ fontSize: '11px', fontWeight: 600, color: '#E8EAED', letterSpacing: '0.3px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 600, color: '#202124', letterSpacing: '0.2px' }}>
               {characterName.toUpperCase()} {characterVersion}
             </span>
           </div>
 
           <div
             style={{
-              backgroundColor: 'rgba(66, 133, 244, 0.15)',
-              border: '1px solid rgba(66, 133, 244, 0.35)',
+              backgroundColor: '#E8F0FE',
+              border: '1px solid #D2E3FC',
               padding: '4px 10px',
               borderRadius: '9999px',
               display: 'flex',
@@ -319,19 +321,19 @@ export const GoogleLabs3D: React.FC<GoogleLabs3DProps> = ({
               gap: '5px',
             }}
           >
-            <Cpu size={12} color="#8AB4F8" />
-            <span style={{ fontSize: '10px', fontWeight: 600, color: '#8AB4F8' }}>
+            <Cpu size={12} color="#1A73E8" />
+            <span style={{ fontSize: '10px', fontWeight: 600, color: '#1A73E8' }}>
               GEMINI 2.0 NEURAL CORE
             </span>
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px', color: '#9AA0A6' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px', color: '#5F6368' }}>
           <span>LATENCY: 420ms</span>
           <span>•</span>
           <span>FPS: {fps}</span>
           <span>•</span>
-          <span style={{ color: '#81C995' }}>DNA LOCKED</span>
+          <span style={{ color: '#137333', fontWeight: 600 }}>DNA SEALED</span>
         </div>
       </div>
 
@@ -350,19 +352,20 @@ export const GoogleLabs3D: React.FC<GoogleLabs3DProps> = ({
       >
         <div
           style={{
-            backgroundColor: 'rgba(30, 31, 34, 0.85)',
+            backgroundColor: 'rgba(255, 255, 255, 0.95)',
             backdropFilter: 'blur(12px)',
-            padding: '5px 12px',
+            padding: '6px 14px',
             borderRadius: '9999px',
-            border: '1px solid #3C4043',
+            border: '1px solid #DADCE0',
+            boxShadow: '0 1px 3px rgba(60,64,67,0.15)',
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
             fontSize: '11px',
-            color: '#E8EAED',
+            color: '#202124',
           }}
         >
-          <Activity size={12} color="#81C995" />
+          <Activity size={12} color="#137333" />
           <span>
             {isSpeaking
               ? "Synthesizing Neural Speech Waveform..."
@@ -377,20 +380,21 @@ export const GoogleLabs3D: React.FC<GoogleLabs3DProps> = ({
             display: 'flex',
             alignItems: 'center',
             gap: '6px',
-            backgroundColor: 'rgba(30, 31, 34, 0.85)',
+            backgroundColor: 'rgba(255, 255, 255, 0.95)',
             backdropFilter: 'blur(12px)',
-            padding: '5px 12px',
+            padding: '6px 14px',
             borderRadius: '9999px',
-            border: '1px solid #3C4043',
+            border: '1px solid #DADCE0',
+            boxShadow: '0 1px 3px rgba(60,64,67,0.15)',
             fontSize: '10px',
-            color: '#9AA0A6',
+            color: '#5F6368',
           }}
         >
-          <span style={{ color: '#4285F4' }}>●</span>
-          <span style={{ color: '#EA4335' }}>●</span>
-          <span style={{ color: '#FBBC04' }}>●</span>
-          <span style={{ color: '#34A853' }}>●</span>
-          <span style={{ marginLeft: '4px', fontWeight: 600 }}>GOOGLE LABS THREE.JS ENGINE</span>
+          <span style={{ color: '#1A73E8' }}>●</span>
+          <span style={{ color: '#D93025' }}>●</span>
+          <span style={{ color: '#B06000' }}>●</span>
+          <span style={{ color: '#137333' }}>●</span>
+          <span style={{ marginLeft: '4px', fontWeight: 600 }}>NEURAL AVATAR 3D CORE</span>
         </div>
       </div>
     </div>

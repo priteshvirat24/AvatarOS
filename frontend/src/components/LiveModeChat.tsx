@@ -523,8 +523,8 @@ export const LiveModeChat: React.FC<LiveModeChatProps> = ({ onHandoffToStudio })
           padding: '20px',
           position: 'relative',
           overflow: 'hidden',
-          backgroundColor: '#000',
-          border: '1px solid var(--border-focus)'
+          backgroundColor: '#FFFFFF',
+          border: '1px solid var(--border-subtle)'
         }}>
           {/* Top HUD: DNA Sealing & Character Version */}
           <div style={{
@@ -548,7 +548,7 @@ export const LiveModeChat: React.FC<LiveModeChatProps> = ({ onHandoffToStudio })
             </span>
           </div>
 
-          {/* 3D Google Labs Hologram Visualizer */}
+          {/* 3D Hologram Visualizer */}
           <div style={{
             position: 'relative',
             width: '100%',
@@ -907,13 +907,13 @@ export const LiveModeChat: React.FC<LiveModeChatProps> = ({ onHandoffToStudio })
                   maxWidth: '80%',
                   padding: '12px 16px',
                   borderRadius: 'var(--radius-lg)',
-                  backgroundColor: isMaya ? 'var(--bg-surface-elevated)' : 'var(--primary)',
+                  backgroundColor: isMaya ? 'var(--color-surface-variant)' : 'var(--color-primary)',
                   border: isMaya
                     ? t.is_deflection
                       ? '1px solid var(--accent-amber)'
                       : '1px solid var(--border-subtle)'
                     : 'none',
-                  color: 'var(--text-primary)',
+                  color: isMaya ? 'var(--text-primary)' : '#FFFFFF',
                   fontSize: '13px',
                   lineHeight: 1.5
                 }}>

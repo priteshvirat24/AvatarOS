@@ -1,23 +1,23 @@
 ---
-name: Google DeepMind AvatarOS
-description: Official Google Design Language specification and tokens for AvatarOS Autonomous Digital Human Studio
+name: AvatarOS Light Theme
+description: Design specification and tokens for AvatarOS Autonomous Digital Human Platform
 colors:
-  primary: "#8AB4F8"
-  primary-container: "#1A73E8"
-  on-primary: "#041E49"
-  secondary: "#81C995"
-  tertiary: "#FDD663"
-  neutral: "#E8EAED"
-  error: "#F28B82"
-  background: "#131314"
-  surface: "#1E1F22"
-  surface-variant: "#282A2C"
-  surface-elevated: "#303134"
-  outline: "#3C4043"
-  google-blue: "#4285F4"
-  google-red: "#EA4335"
-  google-yellow: "#FBBC04"
-  google-green: "#34A853"
+  primary: "#1A73E8"
+  primary-container: "#E8F0FE"
+  on-primary: "#FFFFFF"
+  secondary: "#137333"
+  tertiary: "#B06000"
+  neutral: "#202124"
+  error: "#C5221F"
+  background: "#FFFFFF"
+  surface: "#F8F9FA"
+  surface-variant: "#F1F3F4"
+  surface-elevated: "#FFFFFF"
+  outline: "#DADCE0"
+  google-blue: "#1A73E8"
+  google-red: "#D93025"
+  google-yellow: "#B06000"
+  google-green: "#137333"
 typography:
   h1:
     fontFamily: Google Sans
@@ -73,17 +73,17 @@ components:
     padding: 4px 10px
   badge-green:
     backgroundColor: "{colors.secondary}"
-    textColor: "{colors.surface}"
+    textColor: "{colors.on-primary}"
     rounded: "{rounded.full}"
     padding: 4px 10px
   badge-yellow:
     backgroundColor: "{colors.tertiary}"
-    textColor: "{colors.surface}"
+    textColor: "{colors.on-primary}"
     rounded: "{rounded.full}"
     padding: 4px 10px
   badge-red:
     backgroundColor: "{colors.error}"
-    textColor: "{colors.surface}"
+    textColor: "{colors.on-primary}"
     rounded: "{rounded.full}"
     padding: 4px 10px
   workspace-canvas:
@@ -98,50 +98,46 @@ components:
     padding: 1px
   brand-blue-accent:
     backgroundColor: "{colors.google-blue}"
-    textColor: "{colors.surface}"
+    textColor: "{colors.on-primary}"
     rounded: "{rounded.sm}"
     padding: 4px
   brand-red-accent:
     backgroundColor: "{colors.google-red}"
-    textColor: "{colors.background}"
+    textColor: "{colors.on-primary}"
     rounded: "{rounded.sm}"
     padding: 4px
   brand-yellow-accent:
     backgroundColor: "{colors.google-yellow}"
-    textColor: "{colors.surface}"
+    textColor: "{colors.on-primary}"
     rounded: "{rounded.sm}"
     padding: 4px
   brand-green-accent:
     backgroundColor: "{colors.google-green}"
-    textColor: "{colors.surface}"
+    textColor: "{colors.on-primary}"
     rounded: "{rounded.sm}"
     padding: 4px
 ---
 
 ## Overview
 
-AvatarOS adopts the official Google Design System, blending the visual clarity of Google Material You (M3), the precision of Google Cloud Platform & Vertex AI, and the futuristic elegance of Google DeepMind and Google Labs. 
-
-The user interface delivers a high-trust, responsive control plane for autonomous digital human orchestration. Every surface adheres to Google's signature dark aesthetic (`#131314`), accented by the iconic Google four-color harmony: Google Blue (`#4285F4`), Google Red (`#EA4335`), Google Yellow (`#FBBC04`), and Google Green (`#34A853`).
+AvatarOS adopts the official Google Light Design System, embodying the clean aesthetic of Google Search, Google Workspace, Google Cloud Console, and Google DeepMind. The canvas transitions from dark tones to crisp pure white (`#FFFFFF`) and warm off-white surface foundations (`#F8F9FA`), paired with Google's signature four-color identity: Google Blue (`#1A73E8`), Google Red (`#D93025`), Google Yellow (`#B06000`), and Google Green (`#137333`).
 
 ## Colors
 
-The color system is calibrated for deep focus, accessibility, and recognizable Google identity:
+The light color palette is engineered for executive readability, high-trust safety audits, and full WCAG AAA accessibility:
 
-- **Primary (`#8AB4F8`):** Google Blue 300, used for active navigational elements, key action targets, and focused states in dark theme.
-- **Primary Container (`#1A73E8`):** Google Blue 600, used for interactive badges, elevated buttons, and primary indicator fills.
-- **On Primary (`#041E49`):** High-contrast dark ink ensuring WCAG AAA compliant text contrast against primary buttons.
-- **Secondary (`#81C995`):** Google Green 300, representing verified safety gates, published media, healthy ClickHouse telemetry, and passed evaluations.
-- **Tertiary (`#FDD663`):** Google Yellow 300, reserved for pending reviews, advisory notices, active audio processing, and latency gauges.
-- **Error (`#F28B82`):** Google Red 300, communicating safety blocks, rights violations, and unverified factual claims.
-- **Background (`#131314`):** Official Google standard dark canvas foundation.
-- **Surface (`#1E1F22`):** First elevation layer for workspace cards, sidebars, and control panels.
-- **Surface Elevated (`#303134`):** Modal dialogs, dropdowns, and floating command bars.
-- **Outline (`#3C4043`):** Subtle Google divider borders maintaining structural definition without visual clutter.
+- **Primary (`#1A73E8`):** Official Google Blue 600, used for primary actions, navigation indicators, and focused elements.
+- **Primary Container (`#E8F0FE`):** Soft blue surface tint for active tabs and selected cards.
+- **On Primary (`#FFFFFF`):** Pure white ink ensuring maximum contrast against primary button fills.
+- **Secondary (`#137333`):** Official Google Green 700, representing verified rights, approved safety checks, and healthy ClickHouse telemetry.
+- **Tertiary (`#B06000`):** Google Amber 800, communicating advisory notices, in-progress reviews, and latency gauges with strict contrast compliance.
+- **Error (`#C5221F`):** Google Red 700, highlighting hallucinated claims, unauthorized likeness requests, and blocked gates.
+- **Background (`#FFFFFF`):** Crisp pure white canvas foundation.
+- **Surface (`#F8F9FA`):** Google off-white elevation layer for cards, sidebars, and workspaces.
+- **Surface Elevated (`#FFFFFF`):** High-elevation modals, floating toolbars, and search prompts with subtle drop shadows.
+- **Outline (`#DADCE0`):** Official Google border divider line for clean structural separation.
 
 ## Typography
-
-Typography prioritizes geometric clarity, editorial elegance, and instant legibility across complex DAG traces and conversational transcripts:
 
 - **Google Sans / Display:** Applied to primary view titles, modal headings, and brand mastheads.
 - **Roboto / Body:** Applied to conversational speech bubbles, character descriptions, and telemetry metrics.
@@ -149,49 +145,37 @@ Typography prioritizes geometric clarity, editorial elegance, and instant legibi
 
 ## Layout
 
-Layout follows Google's 8pt grid system with full responsive fluid scaling:
-
-- **Top Application Bar:** 56px fixed height with Google 4-color accent micro-bar, pill navigation switcher, and provider status indicators.
-- **Single-Action Command Bar:** Google Search-style pill container with embedded language and register selectors.
-- **Three-Column Autonomous Studio:**
-  - Left Column (280px): Digital Cast & Persistent Identity Roster.
-  - Center Column (Flex 1): Live Stage with Three.js 3D Holographic Core & Master Video Player.
-  - Right Column (420px): Vertex AI Agent Execution Graph & DAG Trace Inspector.
-- **Bottom Timeline:** Fixed 72px production timeline scrubber.
+- **Top Application Bar:** 56px fixed height with Google 4-color micro-bar, pill navigation switcher, and Cinematic Judge Mode launcher.
+- **Google Search Command Bar:** Pure white pill container with embedded language and register selectors.
+- **Three-Column Autonomous Studio:** Left Cast roster (280px), Center Live Stage (Flex 1), Right Vertex AI DAG trace (400px).
+- **Cinematic Judge Mode Overlay:** Fullscreen theater presentation with chapter navigation, audio-visual narrative, and interactive demonstration triggers.
 
 ## Elevation & Depth
 
-Surfaces employ tonal elevation rather than heavy drop shadows, consistent with Google Material 3:
-
-- **Level 0 (Canvas):** `#131314` flat background.
-- **Level 1 (Cards):** `#1E1F22` with 1px `#3C4043` border.
-- **Level 2 (Hover/Active):** `#282A2C` with subtle glow (`rgba(138, 180, 248, 0.12)`).
-- **Level 3 (Modals/Overlays):** `#303134` with 24px backdrop blur and soft ambient shadow.
+Material Design 3 light elevation shadows:
+- **Level 1 (Cards):** `0 1px 2px 0 rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15)`.
+- **Level 2 (Hover/Active):** `0 1px 3px 0 rgba(60,64,67,0.3), 0 4px 8px 3px rgba(60,64,67,0.15)`.
+- **Level 3 (Modals/Overlays):** `0 8px 24px rgba(60,64,67,0.2)`.
 
 ## Shapes
 
-Shape language is defined by rounded pills and friendly radii:
-
-- **Buttons & Chips:** Pill shaped (`rounded: full` / `9999px`) for actions and filters.
-- **Cards & Viewports:** Smooth `16px` radius (`rounded: lg`).
-- **Input Fields & Form Elements:** `8px` radius (`rounded: md`).
+- Pill-shaped geometry (`rounded: full` / `9999px`) for buttons, search bars, and status indicators.
+- Friendly `16px` radius (`rounded: lg`) for cards, viewports, and modals.
 
 ## Components
 
-- **Pill Navigation Switcher:** Segmented control with smooth sliding pill indicator for Studio, Live, Evolution, and Knowledge modes.
-- **Google Labs 3D Canvas:** Interactive Three.js WebGL holographic avatar core with audio reactivity and orbit damping.
-- **Agent Pipeline Trace:** Vertex AI style DAG nodes showing Research, Claims, Script, Director, Performance, Guardian, and Publisher states.
-- **Looker Studio Metric Cards:** Real-time KPI scorecards displaying ClickHouse query duration, cache hit rates, and ingestion throughput.
+- **Cinematic Judge Mode:** 6-chapter widescreen interactive theater presentation with live action triggers.
+- **Google Labs 3D Canvas:** Three.js WebGL holographic core rendered with alpha transparency on white background.
+- **Looker Studio Metric Cards:** Clean KPI scorecards displaying ClickHouse query duration, cache hit rates, and ingestion throughput.
+- **Vertex AI DAG Pipeline:** Staggered execution cards with Google Material badges.
 
 ## Do's and Don'ts
 
 ### Do's
-- **Do** use the Google 4-color gradient (`#4285F4`, `#EA4335`, `#FBBC04`, `#34A853`) as a subtle micro-accent or indicator, not as a dominating background fill.
-- **Do** use pill-shaped containers (`border-radius: 9999px`) for search bars, status badges, and primary action buttons.
-- **Do** ensure all text maintains at least 4.5:1 contrast against its immediate background.
-- **Do** apply smooth spring physics via Framer Motion for modal transitions and view switches.
+- **Do** maintain crisp white `#FFFFFF` and off-white `#F8F9FA` foundations with high contrast dark charcoal text (`#202124`).
+- **Do** use pill-shaped containers (`border-radius: 9999px`) for search bars, action buttons, and status badges.
+- **Do** provide hackathon judges with one-click access to Cinematic Judge Mode.
 
 ### Don'ts
-- **Don't** use generic oversaturated neon glows or uncurated color schemes.
-- **Don't** use sharp rectangular 0px borders for interactive buttons.
-- **Don't** mix inconsistent font families; strictly stick to Google Sans, Roboto, and Roboto Mono.
+- **Don't** use dark or muddy backgrounds.
+- **Don't** use uncurated light text that fails contrast checks against white surfaces.

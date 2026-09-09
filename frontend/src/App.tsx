@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Film, Sparkles, MessageSquare, Database, Terminal, Shield, RefreshCw,
-  Play, CheckCircle2, AlertTriangle, Layers, Dna, UploadCloud, BookOpen, Globe, Cloud, Search
+  Home, Film, Sparkles, MessageSquare, Database, Terminal, Shield, RefreshCw,
+  Play, CheckCircle2, AlertTriangle, Layers, Dna, UploadCloud, BookOpen, Globe, Cloud, Search, Award
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
+import { HomePage } from './components/HomePage';
 import { DigitalCast } from './components/DigitalCast';
 import { LiveStage } from './components/LiveStage';
 import { AgentActivity } from './components/AgentActivity';
@@ -16,16 +17,35 @@ import { DemoGuide } from './components/DemoGuide';
 import { DnaModal } from './components/DnaModal';
 import { CompilerModal } from './components/CompilerModal';
 import { ProviderMatrixModal } from './components/ProviderMatrixModal';
+import { CinematicJudgeMode } from './components/CinematicJudgeMode';
 
 export const App: React.FC = () => {
   const [cast, setCast] = useState<any[]>([]);
   const [selectedCharacterId, setSelectedCharacterId] = useState<string>('maya');
   const [selectedLanguage, setSelectedLanguage] = useState<'en' | 'hi'>('en');
   const [selectedRegister, setSelectedRegister] = useState<string>('technical');
-  const [viewMode, setViewMode] = useState<'studio' | 'live' | 'evolution' | 'knowledge'>('studio');
+  const getInitialPage = (): 'home' | 'studio' | 'live' | 'evolution' | 'knowledge' => {
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash.replace('#', '');
+      if (['home', 'studio', 'live', 'evolution', 'knowledge'].includes(hash)) {
+        return hash as any;
+      }
+    }
+    return 'home';
+  };
+
+  const [viewMode, setViewMode] = useState<'home' | 'studio' | 'live' | 'evolution' | 'knowledge'>(getInitialPage());
+  const [showJudgeMode, setShowJudgeMode] = useState(false);
   const [commandInput, setCommandInput] = useState<string>(
     "Create a 60-second product launch for Indian developers. Research our documentation first. Do not make unsupported claims. Produce English and Hindi versions."
   );
+
+  const navigateTo = (page: 'home' | 'studio' | 'live' | 'evolution' | 'knowledge') => {
+    setViewMode(page);
+    if (typeof window !== 'undefined') {
+      window.location.hash = page;
+    }
+  };
 
   const [campaignData, setCampaignData] = useState<any>(null);
   const [isExecuting, setIsExecuting] = useState(false);
@@ -43,8 +63,18 @@ export const App: React.FC = () => {
       .then((data) => setCast(data))
       .catch(console.error);
 
-    // Initial autonomous production run to populate studio stage
+    // Initial autonomous production run to populate studio stage in background
     runProduction({ injectClaimFail: false, injectEmotionFail: false, simulateRightsFail: false });
+
+    // Sync hash changes with viewMode
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace('#', '');
+      if (['home', 'studio', 'live', 'evolution', 'knowledge'].includes(hash)) {
+        setViewMode(hash as any);
+      }
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
   const runProduction = async (opts: {
@@ -240,33 +270,37 @@ export const App: React.FC = () => {
         flexShrink: 0
       }}>
         {/* Brand */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div
+          onClick={() => navigateTo('home')}
+          style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', userSelect: 'none' }}
+          title="Go to AvatarOS Home"
+        >
           <div style={{
             width: '32px',
             height: '32px',
             borderRadius: '50%',
-            background: 'linear-gradient(135deg, #4285F4 0%, #1A73E8 100%)',
+            background: 'linear-gradient(135deg, #1A73E8 0%, #174EA6 100%)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             color: 'white',
             fontWeight: 800,
             fontSize: '16px',
-            boxShadow: '0 2px 8px rgba(66, 133, 244, 0.4)'
+            boxShadow: '0 2px 8px rgba(26, 115, 232, 0.4)'
           }}>
-            G
+            A
           </div>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <h1 style={{ fontSize: '16px', fontWeight: 600, letterSpacing: '-0.2px', fontFamily: 'Google Sans, sans-serif' }}>
+              <h1 style={{ fontSize: '16px', fontWeight: 600, letterSpacing: '-0.2px', fontFamily: 'Google Sans, -apple-system, sans-serif' }}>
                 Avatar<span style={{ color: 'var(--color-primary)' }}>OS</span>
               </h1>
               <span className="badge-neon badge-primary" style={{ fontSize: '9px', padding: '1px 8px' }}>
-                GOOGLE LABS
+                ENTERPRISE
               </span>
             </div>
             <p style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>
-              Gemini 2.0 Autonomous Digital Human Studio
+              Autonomous Digital Human Operating System
             </p>
           </div>
         </div>
@@ -282,7 +316,22 @@ export const App: React.FC = () => {
         }}>
           <button
             className="btn"
-            onClick={() => setViewMode('studio')}
+            onClick={() => navigateTo('home')}
+            style={{
+              padding: '6px 16px',
+              fontSize: '12px',
+              borderRadius: 'var(--radius-full)',
+              backgroundColor: viewMode === 'home' ? 'var(--color-primary)' : 'transparent',
+              color: viewMode === 'home' ? 'var(--color-on-primary)' : 'var(--text-muted)',
+              fontWeight: viewMode === 'home' ? 600 : 500
+            }}
+          >
+            <Home size={13} />
+            Home
+          </button>
+          <button
+            className="btn"
+            onClick={() => navigateTo('studio')}
             style={{
               padding: '6px 16px',
               fontSize: '12px',
@@ -297,7 +346,7 @@ export const App: React.FC = () => {
           </button>
           <button
             className="btn"
-            onClick={() => setViewMode('live')}
+            onClick={() => navigateTo('live')}
             style={{
               padding: '6px 16px',
               fontSize: '12px',
@@ -308,11 +357,11 @@ export const App: React.FC = () => {
             }}
           >
             <MessageSquare size={13} />
-            Live Mode (Gemini)
+            Live Mode (Realtime)
           </button>
           <button
             className="btn"
-            onClick={() => setViewMode('evolution')}
+            onClick={() => navigateTo('evolution')}
             style={{
               padding: '6px 16px',
               fontSize: '12px',
@@ -327,7 +376,7 @@ export const App: React.FC = () => {
           </button>
           <button
             className="btn"
-            onClick={() => setViewMode('knowledge')}
+            onClick={() => navigateTo('knowledge')}
             style={{
               padding: '6px 16px',
               fontSize: '12px',
@@ -350,7 +399,7 @@ export const App: React.FC = () => {
             onClick={() => setShowProviderMatrixModal(true)}
           >
             <Cloud size={13} color="var(--color-primary)" />
-            Google Cloud (11/11 Active)
+            Cloud Infrastructure (11/11 Active)
           </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <div className="status-dot active" />
@@ -363,6 +412,28 @@ export const App: React.FC = () => {
           >
             <Dna size={13} color="var(--color-primary)" />
             DNA Inspector
+          </button>
+          <button
+            className="btn judge-mode-btn"
+            style={{
+              padding: '6px 14px',
+              fontSize: '11px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              borderRadius: 'var(--radius-full)',
+              background: 'linear-gradient(135deg, #1A73E8 0%, #174EA6 100%)',
+              color: '#FFFFFF',
+              boxShadow: '0 2px 8px rgba(26, 115, 232, 0.4)'
+            }}
+            onClick={() => setShowJudgeMode(true)}
+            title="Open Cinematic Judge Walkthrough"
+          >
+            <Award size={14} color="#FFD700" />
+            <span>JUDGE MODE</span>
+            <span style={{ backgroundColor: 'rgba(255,255,255,0.25)', padding: '1px 6px', borderRadius: '9999px', fontSize: '9px' }}>
+              TOUR
+            </span>
           </button>
         </div>
       </header>
@@ -457,6 +528,38 @@ export const App: React.FC = () => {
       {/* Main Workspace Body with Framer Motion transitions */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
         <AnimatePresence mode="wait">
+          {viewMode === 'home' && (
+            <motion.div
+              key="home"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.2 }}
+              style={{ flex: 1, display: 'flex', overflow: 'hidden' }}
+            >
+              <HomePage
+                onNavigate={(page) => {
+                  if (page === 'cast') {
+                    navigateTo('studio');
+                  } else {
+                    navigateTo(page);
+                  }
+                }}
+                onOpenJudgeMode={() => setShowJudgeMode(true)}
+                onInspectDna={() => setDnaModalCharId(selectedCharacterId || 'maya')}
+                onLaunchPreset={(brief) => {
+                  setCommandInput(brief);
+                  navigateTo('studio');
+                  runProduction({ customBrief: brief });
+                }}
+                onTriggerClaimDemo={() => {
+                  navigateTo('studio');
+                  handleDemoClaimBlock();
+                }}
+              />
+            </motion.div>
+          )}
+
           {viewMode === 'studio' && (
             <motion.div
               key="studio"
@@ -557,22 +660,22 @@ export const App: React.FC = () => {
         onSelectStep={(step) => {
           setDemoStep(step);
           if (step === 1) setDnaModalCharId('maya');
-          if (step === 2) setViewMode('studio');
-          if (step === 3) setViewMode('studio');
-          if (step === 6) setViewMode('studio');
-          if (step === 7) setViewMode('live');
-          if (step === 8 || step === 9) setViewMode('evolution');
+          if (step === 2) navigateTo('studio');
+          if (step === 3) navigateTo('studio');
+          if (step === 6) navigateTo('studio');
+          if (step === 7) navigateTo('live');
+          if (step === 8 || step === 9) navigateTo('evolution');
         }}
         onExecuteFullRun={() => {
-          setViewMode('studio');
+          navigateTo('studio');
           runProduction({});
         }}
         onTriggerClaimFail={handleDemoClaimBlock}
         onResolveClaim={handleResolveClaim}
         onTriggerEmotionFail={handleDemoGuardianFailure}
         onReworkScene={handleReworkScene}
-        onOpenLiveMode={() => setViewMode('live')}
-        onOpenEvolution={() => setViewMode('evolution')}
+        onOpenLiveMode={() => navigateTo('live')}
+        onOpenEvolution={() => navigateTo('evolution')}
       />
 
       {/* Modals */}
@@ -586,6 +689,40 @@ export const App: React.FC = () => {
 
       {showProviderMatrixModal && (
         <ProviderMatrixModal isOpen={showProviderMatrixModal} onClose={() => setShowProviderMatrixModal(false)} />
+      )}
+
+      {showJudgeMode && (
+        <CinematicJudgeMode
+          isOpen={showJudgeMode}
+          onClose={() => setShowJudgeMode(false)}
+          onInspectDna={() => {
+            setShowJudgeMode(false);
+            setDnaModalCharId('maya');
+          }}
+          onRunProduction={() => {
+            setShowJudgeMode(false);
+            navigateTo('studio');
+            runProduction({});
+          }}
+          onTriggerClaimFail={() => {
+            setShowJudgeMode(false);
+            navigateTo('studio');
+            handleDemoClaimBlock();
+          }}
+          onResolveClaim={() => {
+            setShowJudgeMode(false);
+            navigateTo('studio');
+            handleResolveClaim();
+          }}
+          onOpenLiveMode={() => {
+            setShowJudgeMode(false);
+            navigateTo('live');
+          }}
+          onOpenEvolution={() => {
+            setShowJudgeMode(false);
+            navigateTo('evolution');
+          }}
+        />
       )}
     </div>
   );
