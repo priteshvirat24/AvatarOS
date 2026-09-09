@@ -139,6 +139,7 @@ export const LiveStage: React.FC<LiveStageProps> = ({
   return (
     <div style={{
       flex: 1,
+      minWidth: 0,
       display: 'flex',
       flexDirection: 'column',
       backgroundColor: 'var(--bg-darkest)',
@@ -147,56 +148,108 @@ export const LiveStage: React.FC<LiveStageProps> = ({
     }}>
       {/* Top Bar for Stage */}
       <div style={{
-        padding: '10px 18px',
+        padding: '8px 14px',
         borderBottom: '1px solid var(--border-subtle)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         backgroundColor: 'var(--bg-base)',
-        gap: '10px'
+        flexWrap: 'wrap',
+        gap: '8px',
+        minHeight: '44px'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flexShrink: 0 }}>
+        {/* Left: Stream Metadata & Audio Controls */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', minWidth: 0 }}>
           {onToggleCast && !showCast && (
             <button
               onClick={onToggleCast}
               className="btn btn-secondary"
               style={{
-                padding: '3px 10px',
+                padding: '2px 8px',
                 fontSize: '11px',
                 borderRadius: 'var(--radius-full)',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '5px',
+                gap: '4px',
                 border: '1px solid var(--border-subtle)',
                 backgroundColor: 'var(--color-surface)',
                 color: 'var(--text-secondary)'
               }}
               title="Open Digital Cast Panel"
             >
-              <User size={12} color="var(--google-blue)" />
+              <User size={11} color="var(--google-blue)" />
               <span>Cast ({castCount})</span>
-              <ChevronRight size={11} />
+              <ChevronRight size={10} />
             </button>
           )}
 
-          <span style={{ fontSize: '11.5px', fontWeight: 800, letterSpacing: '0.8px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
-            DIGITAL HUMAN PERFORMANCE
+          <span style={{ fontSize: '11px', fontWeight: 800, letterSpacing: '0.6px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+            PERFORMANCE
           </span>
+
           {/* Transition Status Badge */}
           <span className={`badge-neon ${
             currentStageStatus === 'APPROVED' ? 'badge-emerald' :
             currentStageStatus === 'SPEAKING' ? 'badge-primary' :
             currentStageStatus === 'PREPARING' ? 'badge-cyan' :
             currentStageStatus === 'VERIFYING' ? 'badge-amber' : 'badge-rose'
-          }`} style={{ fontSize: '9.5px', whiteSpace: 'nowrap' }}>
-            STATUS: {currentStageStatus}
+          }`} style={{ fontSize: '9px', padding: '2px 6px', whiteSpace: 'nowrap' }}>
+            {currentStageStatus}
           </span>
-          <span className="badge-neon badge-secondary" style={{ fontSize: '9px', whiteSpace: 'nowrap' }}>
+
+          <span className="badge-neon badge-secondary" style={{ fontSize: '9px', padding: '2px 5px', whiteSpace: 'nowrap' }}>
             FFmpeg
           </span>
+
+          {/* Language / Audio Track Segmented Toggle */}
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            backgroundColor: 'var(--color-surface)',
+            borderRadius: 'var(--radius-full)',
+            border: '1px solid var(--border-subtle)',
+            padding: '1px',
+            gap: '1px',
+            marginLeft: '2px'
+          }} title="Select Master Audio Track Language">
+            <button
+              onClick={() => { setCurrentLang('en'); setSelectedRepurposedUrl(null); }}
+              style={{
+                padding: '2px 7px',
+                fontSize: '9.5px',
+                fontWeight: 700,
+                borderRadius: 'var(--radius-full)',
+                border: 'none',
+                backgroundColor: currentLang === 'en' ? 'var(--color-primary)' : 'transparent',
+                color: currentLang === 'en' ? '#fff' : 'var(--text-muted)',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+              title="English (Indian)"
+            >
+              EN
+            </button>
+            <button
+              onClick={() => { setCurrentLang('hi'); setSelectedRepurposedUrl(null); }}
+              style={{
+                padding: '2px 7px',
+                fontSize: '9.5px',
+                fontWeight: 700,
+                borderRadius: 'var(--radius-full)',
+                border: 'none',
+                backgroundColor: currentLang === 'hi' ? 'var(--color-secondary)' : 'transparent',
+                color: currentLang === 'hi' ? '#fff' : 'var(--text-muted)',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+              title="Hindi Dub"
+            >
+              HI
+            </button>
+          </div>
         </div>
 
-        {/* View Switcher Tabs (Compact, fits all viewports) */}
+        {/* Right: View Switcher Tabs (Adaptive, fully responsive) */}
         <div style={{
           display: 'flex',
           backgroundColor: 'var(--color-surface)',
@@ -204,135 +257,48 @@ export const LiveStage: React.FC<LiveStageProps> = ({
           borderRadius: 'var(--radius-full)',
           border: '1px solid var(--border-subtle)',
           gap: '2px',
-          flexShrink: 0
+          flexWrap: 'wrap'
         }}>
-          <button
-            className="btn"
-            onClick={() => { setActiveTab('video'); setSelectedRepurposedUrl(null); }}
-            style={{
-              padding: '4px 10px',
-              fontSize: '11px',
-              borderRadius: 'var(--radius-full)',
-              backgroundColor: activeTab === 'video' ? 'var(--color-primary)' : 'transparent',
-              color: activeTab === 'video' ? 'var(--color-on-primary)' : 'var(--text-muted)'
-            }}
-            title="Master Video"
-          >
-            <Film size={12} />
-            Video
-          </button>
-          <button
-            className="btn"
-            onClick={() => setActiveTab('3d_neural_core')}
-            style={{
-              padding: '4px 10px',
-              fontSize: '11px',
-              borderRadius: 'var(--radius-full)',
-              backgroundColor: activeTab === '3d_neural_core' ? 'var(--color-primary)' : 'transparent',
-              color: activeTab === '3d_neural_core' ? 'var(--color-on-primary)' : 'var(--text-muted)'
-            }}
-            title="3D Biometric Neural Core"
-          >
-            <Cpu size={12} />
-            3D Core
-          </button>
-          <button
-            className="btn"
-            onClick={() => setActiveTab('performance_preview')}
-            style={{
-              padding: '4px 10px',
-              fontSize: '11px',
-              borderRadius: 'var(--radius-full)',
-              backgroundColor: activeTab === 'performance_preview' ? 'var(--color-primary)' : 'transparent',
-              color: activeTab === 'performance_preview' ? 'var(--color-on-primary)' : 'var(--text-muted)'
-            }}
-            title="Performance Plan"
-          >
-            <Activity size={12} />
-            Plan
-          </button>
-          <button
-            className="btn"
-            onClick={() => setActiveTab('storyboard')}
-            style={{
-              padding: '4px 10px',
-              fontSize: '11px',
-              borderRadius: 'var(--radius-full)',
-              backgroundColor: activeTab === 'storyboard' ? 'var(--color-primary)' : 'transparent',
-              color: activeTab === 'storyboard' ? 'var(--color-on-primary)' : 'var(--text-muted)'
-            }}
-            title="Multi-Scene Storyboard"
-          >
-            <Layers size={12} />
-            Storyboard
-          </button>
-          <button
-            className="btn"
-            onClick={() => setActiveTab('repurposed')}
-            style={{
-              padding: '4px 10px',
-              fontSize: '11px',
-              borderRadius: 'var(--radius-full)',
-              backgroundColor: activeTab === 'repurposed' ? 'var(--color-primary)' : 'transparent',
-              color: activeTab === 'repurposed' ? 'var(--color-on-primary)' : 'var(--text-muted)'
-            }}
-            title="Omnichannel Vertical Shorts"
-          >
-            <Sparkles size={12} />
-            Shorts ({repurposedClips.length || 3})
-          </button>
-          <button
-            className="btn"
-            onClick={() => setActiveTab('c2pa')}
-            style={{
-              padding: '4px 10px',
-              fontSize: '11px',
-              borderRadius: 'var(--radius-full)',
-              backgroundColor: activeTab === 'c2pa' ? 'var(--color-primary)' : 'transparent',
-              color: activeTab === 'c2pa' ? 'var(--color-on-primary)' : 'var(--text-muted)'
-            }}
-            title="C2PA Cryptographic Provenance Manifest"
-          >
-            <Shield size={12} />
-            C2PA
-          </button>
-        </div>
-
-        {/* Language Toggle */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Audio Track:</span>
-          <button
-            onClick={() => { setCurrentLang('en'); setSelectedRepurposedUrl(null); }}
-            style={{
-              padding: '3px 10px',
-              fontSize: '10px',
-              fontWeight: 700,
-              borderRadius: 'var(--radius-full)',
-              border: '1px solid',
-              borderColor: currentLang === 'en' ? 'var(--color-primary)' : 'var(--border-subtle)',
-              backgroundColor: currentLang === 'en' ? 'rgba(66,133,244,0.2)' : 'transparent',
-              color: currentLang === 'en' ? 'var(--color-primary)' : 'var(--text-muted)',
-              cursor: 'pointer'
-            }}
-          >
-            EN (Indian)
-          </button>
-          <button
-            onClick={() => { setCurrentLang('hi'); setSelectedRepurposedUrl(null); }}
-            style={{
-              padding: '3px 10px',
-              fontSize: '10px',
-              fontWeight: 700,
-              borderRadius: 'var(--radius-full)',
-              border: '1px solid',
-              borderColor: currentLang === 'hi' ? 'var(--color-secondary)' : 'var(--border-subtle)',
-              backgroundColor: currentLang === 'hi' ? 'rgba(52,168,83,0.2)' : 'transparent',
-              color: currentLang === 'hi' ? 'var(--color-secondary)' : 'var(--text-muted)',
-              cursor: 'pointer'
-            }}
-          >
-            HI (Hindi)
-          </button>
+          {[
+            { id: 'video', label: 'Video', icon: Film, title: 'Master Video' },
+            { id: '3d_neural_core', label: '3D Core', icon: Cpu, title: '3D Biometric Neural Core' },
+            { id: 'performance_preview', label: 'Plan', icon: Activity, title: 'Performance Plan' },
+            { id: 'storyboard', label: 'Storyboard', icon: Layers, title: 'Multi-Scene Storyboard' },
+            { id: 'repurposed', label: `Shorts (${repurposedClips.length || 3})`, icon: Sparkles, title: 'Omnichannel Vertical Shorts' },
+            { id: 'c2pa', label: 'C2PA', icon: Shield, title: 'C2PA Cryptographic Provenance Manifest' }
+          ].map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                className="btn"
+                onClick={() => {
+                  setActiveTab(tab.id as any);
+                  if (tab.id === 'video') setSelectedRepurposedUrl(null);
+                }}
+                style={{
+                  padding: '3px 8px',
+                  fontSize: '11px',
+                  fontWeight: isActive ? 700 : 500,
+                  borderRadius: 'var(--radius-full)',
+                  backgroundColor: isActive ? 'var(--color-primary)' : 'transparent',
+                  color: isActive ? 'var(--color-on-primary)' : 'var(--text-secondary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  whiteSpace: 'nowrap'
+                }}
+                title={tab.title}
+              >
+                <Icon size={12} />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
