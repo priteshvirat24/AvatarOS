@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Play, Pause, SkipForward, SkipBack, X, Sparkles, ShieldCheck, Database,
   Film, MessageSquare, Cpu, CheckCircle2, AlertTriangle, ArrowRight,
   Layers, Lock, ExternalLink, Award, FileCode2, Zap, Volume2, ChevronRight,
   ChevronLeft, BarChart3, Fingerprint, Search, ShieldAlert, Check, Radio,
-  Maximize2, Eye, Activity, Terminal
+  Maximize2, Eye, Activity, Terminal, Clock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { JudgeMode3DBackground } from './JudgeMode3DBackground';
@@ -32,9 +32,10 @@ export const CinematicJudgeMode: React.FC<CinematicJudgeModeProps> = ({
 }) => {
   const [currentChapter, setCurrentChapter] = useState(0);
   const [activePointIndex, setActivePointIndex] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(true);
-  const [pointProgress, setPointProgress] = useState(0); // 0 to 100
+  const [isPlaying, setIsPlaying] = useState(false); // Default to paused/manual so judges can read without being rushed!
+  const [pointProgress, setPointProgress] = useState(0);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [readSpeed, setReadSpeed] = useState<'normal' | 'relaxed'>('relaxed'); // 8.5s relaxed reading pace
 
   const chapters = [
     {
@@ -122,9 +123,9 @@ export const CinematicJudgeMode: React.FC<CinematicJudgeModeProps> = ({
 
           <motion.div
             key={ptIndex}
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.3 }}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35 }}
             style={{
               backgroundColor: ptIndex === 0 ? '#E8F0FE' : ptIndex === 1 ? '#E6F4EA' : '#FEF7E0',
               borderRadius: '12px',
@@ -208,7 +209,7 @@ export const CinematicJudgeMode: React.FC<CinematicJudgeModeProps> = ({
               <motion.div
                 key={i}
                 animate={{ scale: st.active ? 1.02 : 1 }}
-                transition={{ duration: 0.2 }}
+                transition={{ duration: 0.25 }}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -217,7 +218,7 @@ export const CinematicJudgeMode: React.FC<CinematicJudgeModeProps> = ({
                   borderRadius: '10px',
                   backgroundColor: st.active ? '#E8F0FE' : '#F8F9FA',
                   border: `1.5px solid ${st.active ? '#1A73E8' : '#DADCE0'}`,
-                  boxShadow: st.active ? '0 4px 14px rgba(26, 115, 232, 0.15)' : 'none'
+                  boxShadow: st.active ? '0 4px 14px rgba(26, 115, 232, 0.12)' : 'none'
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -292,7 +293,7 @@ export const CinematicJudgeMode: React.FC<CinematicJudgeModeProps> = ({
           </div>
 
           <motion.div
-            initial={{ scale: 0.95 }}
+            initial={{ scale: 0.98 }}
             animate={{ scale: 1 }}
             style={{
               padding: '14px',
@@ -476,8 +477,9 @@ export const CinematicJudgeMode: React.FC<CinematicJudgeModeProps> = ({
           </div>
 
           <div style={{
-            backgroundColor: '#202124',
-            color: '#F8F9FA',
+            backgroundColor: '#F8F9FA',
+            border: '1px solid #DADCE0',
+            color: '#202124',
             padding: '14px',
             borderRadius: '12px',
             fontFamily: 'Roboto Mono, monospace',
@@ -487,14 +489,14 @@ export const CinematicJudgeMode: React.FC<CinematicJudgeModeProps> = ({
             flexDirection: 'column',
             gap: '6px'
           }}>
-            <div style={{ color: '#8AB4F8' }}>$ mcp query --tool=clickhouse_telemetry</div>
-            <div style={{ color: '#81C995' }}>SELECT hook_style, avg(retention_rate)</div>
-            <div style={{ color: '#81C995' }}>FROM audience_telemetry GROUP BY hook_style;</div>
-            <div style={{ borderTop: '1px solid #3C4043', marginTop: '8px', paddingTop: '8px' }}>
-              <div style={{ color: '#FFFFFF', fontWeight: 700 }}>technical_breakdown: 84.2% [n=62] (Winner)</div>
-              <div style={{ color: '#9AA0A6' }}>conversational_hook:  68.1% [n=58]</div>
+            <div style={{ color: '#1A73E8', fontWeight: 700 }}>$ mcp query --tool=clickhouse_telemetry</div>
+            <div style={{ color: '#137333' }}>SELECT hook_style, avg(retention_rate)</div>
+            <div style={{ color: '#137333' }}>FROM audience_telemetry GROUP BY hook_style;</div>
+            <div style={{ borderTop: '1px solid #DADCE0', marginTop: '8px', paddingTop: '8px' }}>
+              <div style={{ color: '#202124', fontWeight: 700 }}>technical_breakdown: 84.2% [n=62] (Winner)</div>
+              <div style={{ color: '#5F6368' }}>conversational_hook:  68.1% [n=58]</div>
             </div>
-            <div style={{ marginTop: 'auto', color: '#FDD663', fontSize: '10px' }}>
+            <div style={{ marginTop: 'auto', color: '#B06000', fontSize: '10px', fontWeight: 600 }}>
               Execution: 2.1ms | Confidence: 99.2% | DDL Blocked
             </div>
           </div>
@@ -562,9 +564,9 @@ export const CinematicJudgeMode: React.FC<CinematicJudgeModeProps> = ({
             ].map((d, i) => (
               <motion.div
                 key={i}
-                initial={{ opacity: 0, scale: 0.85 }}
+                initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: i * 0.05 }}
+                transition={{ delay: i * 0.04 }}
                 style={{
                   backgroundColor: '#F8F9FA',
                   border: '1px solid #DADCE0',
@@ -588,9 +590,12 @@ export const CinematicJudgeMode: React.FC<CinematicJudgeModeProps> = ({
     }
   ];
 
-  // Auto-play timer with running clock
+  // Auto-play timer with comfortable, relaxed reading cadence
   useEffect(() => {
     if (!isOpen || !isPlaying) return;
+
+    // relaxed pace: ~8.5 seconds per insight
+    const increment = readSpeed === 'relaxed' ? 1.15 : 2.0;
 
     const interval = setInterval(() => {
       setElapsedSeconds((s) => s + 0.1);
@@ -606,12 +611,12 @@ export const CinematicJudgeMode: React.FC<CinematicJudgeModeProps> = ({
           });
           return 0;
         }
-        return prev + 2.5; // ~4s cadence
+        return prev + increment;
       });
     }, 100);
 
     return () => clearInterval(interval);
-  }, [isOpen, isPlaying, currentChapter, activePointIndex]);
+  }, [isOpen, isPlaying, currentChapter, activePointIndex, readSpeed]);
 
   const goToChapter = (idx: number) => {
     setCurrentChapter(idx);
@@ -665,7 +670,7 @@ export const CinematicJudgeMode: React.FC<CinematicJudgeModeProps> = ({
   const active = chapters[currentChapter];
   const activePoint = active.points[activePointIndex];
 
-  // Format timecode (e.g. 00:14.2)
+  // Timecode formatting
   const formatTimecode = (sec: number) => {
     const mins = Math.floor(sec / 60);
     const secs = (sec % 60).toFixed(1);
@@ -679,213 +684,199 @@ export const CinematicJudgeMode: React.FC<CinematicJudgeModeProps> = ({
       position: 'fixed',
       inset: 0,
       zIndex: 99999,
-      backgroundColor: '#0D1117',
+      backgroundColor: '#FFFFFF',
       display: 'flex',
       flexDirection: 'column',
       overflow: 'hidden',
-      fontFamily: 'Roboto, -apple-system, sans-serif'
+      fontFamily: 'Google Sans, Roboto, -apple-system, sans-serif'
     }}>
-      {/* 1. SWIFT 3D BACKGROUND ENGINE: High-speed warp particles & biometric mesh */}
+      {/* 1. SWIFT AND SLOW 3D BACKGROUND ENGINE: Subtle, non-distracting watermark */}
       <JudgeMode3DBackground
-        opacity={0.52}
-        speedMultiplier={1.45}
+        opacity={0.09}
+        speedMultiplier={0.25}
         activeChapter={currentChapter}
         activePoint={activePointIndex}
       />
 
-      {/* Cinematic Vignette Overlay */}
-      <div style={{
-        position: 'absolute',
-        inset: 0,
-        pointerEvents: 'none',
-        zIndex: 1,
-        background: 'radial-gradient(circle at center, transparent 35%, rgba(13, 17, 23, 0.75) 100%)'
-      }} />
+      {/* Official Google 4-Color Accent Line */}
+      <div className="google-accent-line" style={{ position: 'relative', zIndex: 10 }} />
 
-      {/* 2. TOP CINEMATIC HEADER BAR */}
+      {/* 2. TOP HEADER BAR: Google Light Theme */}
       <header style={{
-        height: '60px',
-        padding: '0 32px',
+        height: '56px',
+        padding: '0 28px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-        backgroundColor: 'rgba(13, 17, 23, 0.75)',
-        backdropFilter: 'blur(20px)',
+        borderBottom: '1px solid #DADCE0',
+        backgroundColor: '#FFFFFF',
         position: 'relative',
         zIndex: 10
       }}>
-        {/* Left: REC Indicator & Timecode */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        {/* Left: Brand & Timecode */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{
-              width: '10px',
-              height: '10px',
+              width: '8px',
+              height: '8px',
               borderRadius: '50%',
-              backgroundColor: '#D93025',
-              boxShadow: '0 0 10px #D93025'
+              backgroundColor: '#D93025'
             }} />
             <span style={{
-              fontSize: '12px',
-              fontWeight: 800,
-              letterSpacing: '1px',
-              color: '#FFFFFF',
+              fontSize: '11px',
+              fontWeight: 700,
+              letterSpacing: '0.8px',
+              color: '#202124',
               fontFamily: 'Roboto Mono, monospace'
             }}>
-              REC ● 4K 60FPS
+              LIVE TOUR
             </span>
           </div>
 
           <div style={{
-            fontSize: '12px',
+            fontSize: '11px',
             fontFamily: 'Roboto Mono, monospace',
-            color: '#8AB4F8',
-            backgroundColor: 'rgba(26, 115, 232, 0.15)',
-            padding: '4px 10px',
-            borderRadius: '6px',
-            border: '1px solid rgba(66, 133, 244, 0.3)'
+            color: '#1A73E8',
+            backgroundColor: '#E8F0FE',
+            padding: '3px 8px',
+            borderRadius: 'var(--radius-full)',
+            border: '1px solid #D2E3FC'
           }}>
             TC {formatTimecode(elapsedSeconds)} / 01:30.0
           </div>
-        </div>
 
-        {/* Center: Active Act / Title Banner */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{
-            fontSize: '11px',
-            fontWeight: 700,
-            letterSpacing: '1px',
-            color: active.tagColor,
-            textTransform: 'uppercase'
-          }}>
-            {active.act}
-          </span>
-          <span style={{ color: 'rgba(255,255,255,0.3)' }}>•</span>
-          <span style={{ fontSize: '13px', fontWeight: 600, color: '#FFFFFF' }}>
+          <span style={{ color: '#DADCE0' }}>|</span>
+
+          <span style={{ fontSize: '12px', fontWeight: 600, color: '#5F6368' }}>
             {active.title}
           </span>
         </div>
 
-        {/* Right: Controls & Exit Button */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        {/* Right: Reading Pace Toggle, Play/Pause & Exit */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {/* Relaxed / Manual Speed Mode */}
           <button
-            onClick={() => setIsPlaying(!isPlaying)}
+            onClick={() => {
+              if (isPlaying) {
+                setIsPlaying(false);
+              } else {
+                setIsPlaying(true);
+              }
+            }}
             style={{
-              background: isPlaying ? 'rgba(26, 115, 232, 0.25)' : 'rgba(255, 255, 255, 0.1)',
-              border: `1px solid ${isPlaying ? '#1A73E8' : 'rgba(255, 255, 255, 0.2)'}`,
-              borderRadius: '9999px',
-              padding: '6px 14px',
+              background: isPlaying ? '#E8F0FE' : '#F8F9FA',
+              border: `1px solid ${isPlaying ? '#1A73E8' : '#DADCE0'}`,
+              borderRadius: 'var(--radius-full)',
+              padding: '5px 14px',
               fontSize: '11px',
-              fontWeight: 700,
-              color: '#FFFFFF',
+              fontWeight: 600,
+              color: isPlaying ? '#1A73E8' : '#5F6368',
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
               cursor: 'pointer'
             }}
+            title="Toggle between auto-play and manual reading pace"
           >
-            {isPlaying ? <Pause size={13} color="#8AB4F8" /> : <Play size={13} color="#8AB4F8" />}
-            <span>{isPlaying ? "PAUSE TRAILER" : "PLAY TRAILER"}</span>
+            {isPlaying ? <Pause size={12} color="#1A73E8" /> : <Play size={12} color="#5F6368" />}
+            <span>{isPlaying ? "AUTO ADVANCE (8.5s)" : "MANUAL STEPPING"}</span>
           </button>
 
+          {/* Exit Cinema */}
           <button
             onClick={onClose}
+            className="btn btn-secondary"
             style={{
-              background: 'rgba(255, 255, 255, 0.12)',
-              border: '1px solid rgba(255, 255, 255, 0.25)',
-              borderRadius: '9999px',
-              padding: '6px 14px',
-              fontSize: '12px',
-              fontWeight: 600,
-              color: '#FFFFFF',
+              padding: '5px 14px',
+              fontSize: '11px',
+              borderRadius: 'var(--radius-full)',
               display: 'flex',
               alignItems: 'center',
-              gap: '6px',
-              cursor: 'pointer'
+              gap: '6px'
             }}
-            title="Exit Cinematic Mode (ESC)"
+            title="Exit Judge Tour (ESC)"
           >
-            <X size={14} />
-            <span>EXIT CINEMA</span>
+            <X size={13} />
+            <span>EXIT</span>
           </button>
         </div>
       </header>
 
-      {/* 3. MAIN CINEMATIC THEATER VIEW (Widescreen 16:9 Stage) */}
+      {/* Reading Progress Line for Current Point */}
+      <div style={{ width: '100%', height: '2px', backgroundColor: '#F1F3F4', position: 'relative', zIndex: 10 }}>
+        <div style={{
+          width: isPlaying ? `${pointProgress}%` : '100%',
+          height: '100%',
+          backgroundColor: active.tagColor,
+          transition: isPlaying ? 'width 0.1s linear' : 'none'
+        }} />
+      </div>
+
+      {/* 3. MAIN WORKSPACE: Pristine Placement & Google Light Aesthetics */}
       <main style={{
         flex: 1,
         display: 'grid',
-        gridTemplateColumns: '1.2fr 1fr',
-        gap: '40px',
-        padding: '36px 48px',
-        maxWidth: '1440px',
+        gridTemplateColumns: '1.25fr 1fr',
+        gap: '36px',
+        padding: '32px 48px',
+        maxWidth: '1360px',
         margin: '0 auto',
         width: '100%',
         alignItems: 'center',
         position: 'relative',
-        zIndex: 10
+        zIndex: 10,
+        overflow: 'hidden'
       }}>
-        {/* LEFT COLUMN: KINETIC TYPOGRAPHY & POP-UP TEXT */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        {/* LEFT COLUMN: KINETIC TYPOGRAPHY & SEQUENTIAL INSIGHTS */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           
           {/* Act Badge & Tagline */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{
-              fontSize: '11px',
-              fontWeight: 800,
-              letterSpacing: '1px',
-              padding: '4px 12px',
-              borderRadius: '9999px',
-              backgroundColor: active.tagColor,
-              color: '#FFFFFF',
-              boxShadow: `0 0 16px ${active.tagColor}66`
-            }}>
+            <span className="badge-neon badge-primary" style={{ padding: '3px 12px', fontSize: '10px' }}>
               {active.badge}
             </span>
             <span style={{
-              fontSize: '12px',
-              color: '#9AA0A6',
+              fontSize: '11.5px',
+              color: '#5F6368',
               fontFamily: 'Roboto Mono, monospace'
             }}>
               {active.illustrationBadge}
             </span>
           </div>
 
-          {/* Master Headline: Cinematic Pop */}
+          {/* Master Headline: Clean Google Typography */}
           <motion.h1
             key={active.title}
-            initial={{ opacity: 0, y: 16, filter: 'blur(8px)' }}
-            animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-            transition={{ duration: 0.4 }}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, ease: "easeOut" }}
             style={{
-              fontSize: '34px',
-              fontWeight: 800,
-              lineHeight: 1.2,
-              color: '#FFFFFF',
+              fontSize: '32px',
+              fontWeight: 700,
+              lineHeight: 1.25,
+              color: '#202124',
               letterSpacing: '-0.02em',
-              textShadow: '0 4px 24px rgba(0, 0, 0, 0.6)'
+              margin: 0
             }}
           >
             {active.tagline}
           </motion.h1>
 
-          {/* Floating Glass Teleprompter: Core Breakthrough */}
+          {/* Core Breakthrough Callout Box */}
           <div style={{
-            backgroundColor: 'rgba(255, 255, 255, 0.08)',
-            border: '1px solid rgba(255, 255, 255, 0.15)',
-            backdropFilter: 'blur(16px)',
-            borderRadius: '16px',
-            padding: '16px 20px',
-            fontSize: '13.5px',
-            color: '#E8EAED',
-            lineHeight: 1.6,
-            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)'
+            backgroundColor: '#F8F9FA',
+            border: '1px solid #DADCE0',
+            borderRadius: '12px',
+            padding: '14px 18px',
+            fontSize: '13px',
+            color: '#202124',
+            lineHeight: 1.55
           }}>
-            <strong style={{ color: '#8AB4F8' }}>Core Breakthrough: </strong>
+            <strong style={{ color: active.tagColor }}>Core Breakthrough: </strong>
             {active.concept}
           </div>
 
-          {/* Stepper Pills for 3 Proof Points */}
+          {/* Stepper Pills for the 3 Insights */}
           <div style={{ display: 'flex', gap: '8px' }}>
             {active.points.map((pt, idx) => (
               <button
@@ -897,34 +888,35 @@ export const CinematicJudgeMode: React.FC<CinematicJudgeModeProps> = ({
                 style={{
                   flex: 1,
                   padding: '8px 12px',
-                  borderRadius: '10px',
-                  border: `1.5px solid ${activePointIndex === idx ? active.tagColor : 'rgba(255, 255, 255, 0.15)'}`,
-                  backgroundColor: activePointIndex === idx ? 'rgba(26, 115, 232, 0.25)' : 'rgba(255, 255, 255, 0.05)',
+                  borderRadius: 'var(--radius-full)',
+                  border: `1.5px solid ${activePointIndex === idx ? active.tagColor : '#DADCE0'}`,
+                  backgroundColor: activePointIndex === idx ? '#E8F0FE' : '#FFFFFF',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
-                  transition: 'all 0.2s ease'
+                  transition: 'all 0.2s ease',
+                  boxShadow: activePointIndex === idx ? '0 1px 4px rgba(26, 115, 232, 0.2)' : 'none'
                 }}
               >
                 <div style={{
-                  width: '20px',
-                  height: '20px',
+                  width: '18px',
+                  height: '18px',
                   borderRadius: '50%',
-                  backgroundColor: activePointIndex === idx ? active.tagColor : activePointIndex > idx ? '#137333' : 'rgba(255,255,255,0.2)',
+                  backgroundColor: activePointIndex === idx ? active.tagColor : activePointIndex > idx ? '#137333' : '#DADCE0',
                   color: '#FFFFFF',
-                  fontSize: '11px',
-                  fontWeight: 800,
+                  fontSize: '10.5px',
+                  fontWeight: 700,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center'
                 }}>
-                  {activePointIndex > idx ? <Check size={12} /> : idx + 1}
+                  {activePointIndex > idx ? <Check size={11} /> : idx + 1}
                 </div>
                 <span style={{
-                  fontSize: '11.5px',
+                  fontSize: '11px',
                   fontWeight: activePointIndex === idx ? 700 : 500,
-                  color: activePointIndex === idx ? '#FFFFFF' : '#9AA0A6',
+                  color: activePointIndex === idx ? '#1A73E8' : '#5F6368',
                   whiteSpace: 'nowrap',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis'
@@ -935,69 +927,45 @@ export const CinematicJudgeMode: React.FC<CinematicJudgeModeProps> = ({
             ))}
           </div>
 
-          {/* THE EXPLOSIVE POP-UP PROOF CARD (Cinematic Feature) */}
+          {/* ACTIVE SPOTLIGHT INSIGHT CARD: Comfortable, Clean & Readable */}
           <AnimatePresence mode="wait">
             <motion.div
               key={`${currentChapter}-${activePointIndex}`}
-              initial={{ opacity: 0, scale: 0.85, y: 25, filter: 'blur(10px)' }}
-              animate={{ opacity: 1, scale: 1, y: 0, filter: 'blur(0px)' }}
-              exit={{ opacity: 0, scale: 1.05, y: -15, filter: 'blur(6px)' }}
-              transition={{ type: "spring", stiffness: 340, damping: 24 }}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.35, ease: "easeOut" }}
               style={{
-                backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                borderRadius: '18px',
-                padding: '24px',
-                boxShadow: `0 16px 48px rgba(0, 0, 0, 0.45), 0 0 24px ${active.tagColor}33`,
-                border: `2px solid ${active.tagColor}`,
+                backgroundColor: '#FFFFFF',
+                borderRadius: '16px',
+                padding: '22px 24px',
+                boxShadow: '0 4px 16px rgba(60, 64, 67, 0.08), 0 1px 3px rgba(60, 64, 67, 0.04)',
+                border: `1.5px solid ${active.tagColor}`,
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '12px',
-                position: 'relative'
+                gap: '10px'
               }}
             >
-              {/* Point Auto-Advance Progress Bar */}
-              {isPlaying && (
-                <div style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  height: '4px',
-                  backgroundColor: 'rgba(0, 0, 0, 0.06)',
-                  borderTopLeftRadius: '18px',
-                  borderTopRightRadius: '18px',
-                  overflow: 'hidden'
-                }}>
-                  <div style={{
-                    width: `${pointProgress}%`,
-                    height: '100%',
-                    backgroundColor: active.tagColor,
-                    transition: 'width 0.1s linear'
-                  }} />
-                </div>
-              )}
-
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span style={{
-                  fontSize: '11px',
-                  fontWeight: 800,
-                  letterSpacing: '0.8px',
-                  backgroundColor: active.tagColor,
-                  color: '#FFFFFF',
+                  fontSize: '10.5px',
+                  fontWeight: 700,
+                  backgroundColor: '#E8F0FE',
+                  color: active.tagColor,
                   padding: '3px 10px',
-                  borderRadius: '9999px'
+                  borderRadius: 'var(--radius-full)'
                 }}>
                   INSIGHT {activePointIndex + 1} OF 3
                 </span>
-                <span className="badge-neon badge-primary" style={{ fontSize: '10px' }}>
+                <span className="badge-neon badge-primary" style={{ fontSize: '9px' }}>
                   {activePoint.tag}
                 </span>
               </div>
 
-              {/* Punchy Headline that Pops In */}
+              {/* Punchy Headline */}
               <h3 style={{
-                fontSize: '20px',
-                fontWeight: 800,
+                fontSize: '18px',
+                fontWeight: 700,
                 color: '#202124',
                 margin: 0,
                 letterSpacing: '-0.01em'
@@ -1005,9 +973,9 @@ export const CinematicJudgeMode: React.FC<CinematicJudgeModeProps> = ({
                 {activePoint.headline}
               </h3>
 
-              {/* Detailed Technical Explanation */}
+              {/* Detailed Explanation */}
               <p style={{
-                fontSize: '13.5px',
+                fontSize: '13px',
                 color: '#3C4043',
                 lineHeight: 1.6,
                 margin: 0
@@ -1015,77 +983,72 @@ export const CinematicJudgeMode: React.FC<CinematicJudgeModeProps> = ({
                 {activePoint.desc}
               </p>
 
-              {/* Glowing Metric Badge */}
+              {/* Verified Metric Badge */}
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
                 backgroundColor: '#F8F9FA',
-                padding: '10px 14px',
-                borderRadius: '10px',
+                padding: '9px 12px',
+                borderRadius: '8px',
                 border: '1px solid #DADCE0',
-                fontSize: '12px',
+                fontSize: '11.5px',
                 color: '#137333',
-                fontWeight: 700
+                fontWeight: 600
               }}>
-                <CheckCircle2 size={16} color="#137333" />
+                <CheckCircle2 size={15} color="#137333" />
                 <span>{activePoint.metric}</span>
               </div>
             </motion.div>
           </AnimatePresence>
 
           {/* Action Trigger Button */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginTop: '4px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginTop: '2px' }}>
             <button
               onClick={() => active.interactiveAction.onClick()}
+              className="btn btn-primary"
               style={{
-                padding: '12px 24px',
+                padding: '10px 22px',
                 fontSize: '13px',
-                fontWeight: 700,
-                borderRadius: '9999px',
-                background: 'linear-gradient(135deg, #1A73E8 0%, #174EA6 100%)',
-                color: '#FFFFFF',
-                border: 'none',
-                boxShadow: '0 4px 18px rgba(26, 115, 232, 0.45)',
+                fontWeight: 600,
+                borderRadius: 'var(--radius-full)',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease'
+                boxShadow: '0 2px 8px rgba(26, 115, 232, 0.35)'
               }}
             >
               {active.interactiveAction.icon}
               <span>{active.interactiveAction.label}</span>
-              <ArrowRight size={15} />
+              <ArrowRight size={14} />
             </button>
           </div>
         </div>
 
-        {/* RIGHT COLUMN: FLOATING HOLOGRAPHIC TELEMETRY HUD */}
+        {/* RIGHT COLUMN: ARCHITECTURAL TELEMETRY CARD */}
         <div style={{
           height: '460px',
-          backgroundColor: 'rgba(255, 255, 255, 0.94)',
-          borderRadius: '20px',
-          border: '1px solid rgba(255, 255, 255, 0.3)',
-          boxShadow: '0 24px 64px rgba(0, 0, 0, 0.4)',
-          backdropFilter: 'blur(20px)',
-          padding: '24px',
+          backgroundColor: '#FFFFFF',
+          borderRadius: '16px',
+          border: '1px solid #DADCE0',
+          boxShadow: '0 4px 20px rgba(60, 64, 67, 0.08), 0 1px 3px rgba(60, 64, 67, 0.04)',
+          padding: '22px',
           display: 'flex',
           flexDirection: 'column',
           position: 'relative'
         }}>
-          {/* HUD Top Status */}
+          {/* Card Top Title */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             marginBottom: '14px',
-            borderBottom: '1px solid #DADCE0',
+            borderBottom: '1px solid #E8EAED',
             paddingBottom: '12px'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Terminal size={16} color="#1A73E8" />
-              <span style={{ fontSize: '12px', fontWeight: 800, letterSpacing: '0.5px', color: '#202124' }}>
+              <Terminal size={15} color="#1A73E8" />
+              <span style={{ fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.4px', color: '#202124' }}>
                 AVATAROS ARCHITECTURAL TELEMETRY
               </span>
             </div>
@@ -1095,37 +1058,36 @@ export const CinematicJudgeMode: React.FC<CinematicJudgeModeProps> = ({
             </div>
           </div>
 
-          {/* Dynamic Technical Simulator Content */}
+          {/* Dynamic Simulator Content */}
           <div style={{ flex: 1, overflow: 'hidden' }}>
             {active.renderVisual(activePointIndex)}
           </div>
         </div>
       </main>
 
-      {/* 4. BOTTOM CINEMATIC SCRUBBER & TRAILER CONTROLS */}
+      {/* 4. BOTTOM FOOTER CONTROLS: Google Material Light Bar */}
       <footer style={{
-        height: '76px',
-        padding: '0 36px',
-        borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-        backgroundColor: 'rgba(13, 17, 23, 0.85)',
-        backdropFilter: 'blur(20px)',
+        height: '64px',
+        padding: '0 32px',
+        borderTop: '1px solid #DADCE0',
+        backgroundColor: '#F8F9FA',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         position: 'relative',
         zIndex: 10
       }}>
-        {/* Timeline Scrubber Markers (6 Chapters) */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        {/* Scene Pills (6 Chapters) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           {chapters.map((ch, idx) => (
             <button
               key={ch.id}
               onClick={() => goToChapter(idx)}
               style={{
-                height: '8px',
-                width: currentChapter === idx ? '36px' : '10px',
+                height: '7px',
+                width: currentChapter === idx ? '32px' : '9px',
                 borderRadius: '4px',
-                backgroundColor: currentChapter === idx ? active.tagColor : 'rgba(255, 255, 255, 0.25)',
+                backgroundColor: currentChapter === idx ? active.tagColor : '#DADCE0',
                 border: 'none',
                 cursor: 'pointer',
                 transition: 'all 0.25s ease'
@@ -1133,53 +1095,46 @@ export const CinematicJudgeMode: React.FC<CinematicJudgeModeProps> = ({
               title={ch.title}
             />
           ))}
-          <span style={{ fontSize: '12px', color: '#FFFFFF', marginLeft: '10px', fontWeight: 600 }}>
+          <span style={{ fontSize: '11.5px', color: '#5F6368', marginLeft: '10px', fontWeight: 600 }}>
             SCENE {currentChapter + 1} OF 6
           </span>
         </div>
 
-        {/* Step Buttons: Prev Insight / Next Insight */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        {/* Previous & Next Stepper Buttons */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <button
             onClick={goToPrevPoint}
             disabled={currentChapter === 0 && activePointIndex === 0}
+            className="btn btn-secondary"
             style={{
-              padding: '8px 18px',
-              fontSize: '12px',
-              fontWeight: 600,
-              borderRadius: '9999px',
-              backgroundColor: 'rgba(255, 255, 255, 0.1)',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-              color: '#FFFFFF',
+              padding: '6px 14px',
+              fontSize: '11.5px',
+              borderRadius: 'var(--radius-full)',
               display: 'flex',
               alignItems: 'center',
-              gap: '6px',
-              cursor: 'pointer'
+              gap: '6px'
             }}
           >
-            <ChevronLeft size={16} />
+            <ChevronLeft size={15} />
             <span>PREV INSIGHT</span>
           </button>
 
           <button
             onClick={goToNextPoint}
+            className="btn btn-primary"
             style={{
-              padding: '8px 22px',
-              fontSize: '12px',
-              fontWeight: 700,
-              borderRadius: '9999px',
-              backgroundColor: active.tagColor,
-              border: 'none',
-              color: '#FFFFFF',
-              boxShadow: `0 2px 12px ${active.tagColor}66`,
+              padding: '6px 18px',
+              fontSize: '11.5px',
+              fontWeight: 600,
+              borderRadius: 'var(--radius-full)',
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              cursor: 'pointer'
+              boxShadow: '0 2px 6px rgba(26, 115, 232, 0.3)'
             }}
           >
-            <span>{activePointIndex < 2 ? "NEXT INSIGHT" : currentChapter < 5 ? "NEXT SCENE" : "FINISH TRAILER"}</span>
-            <ChevronRight size={16} />
+            <span>{activePointIndex < 2 ? "NEXT INSIGHT" : currentChapter < 5 ? "NEXT SCENE" : "FINISH TOUR"}</span>
+            <ChevronRight size={15} />
           </button>
         </div>
       </footer>
