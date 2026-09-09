@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Film, Sparkles, MessageSquare, Database, Terminal, Shield, RefreshCw,
-  Play, CheckCircle2, AlertTriangle, Layers, Dna, UploadCloud, BookOpen, Globe, Cloud
+  Home, Film, Sparkles, MessageSquare, Database, Terminal, Shield, RefreshCw,
+  Play, CheckCircle2, AlertTriangle, Layers, Dna, UploadCloud, BookOpen, Globe, Cloud, Search, Award,
+  Users, ChevronRight, ChevronUp, ChevronDown, X
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
+import { HomePage } from './components/HomePage';
 import { DigitalCast } from './components/DigitalCast';
 import { LiveStage } from './components/LiveStage';
 import { AgentActivity } from './components/AgentActivity';
@@ -15,6 +18,7 @@ import { DemoGuide } from './components/DemoGuide';
 import { DnaModal } from './components/DnaModal';
 import { CompilerModal } from './components/CompilerModal';
 import { ProviderMatrixModal } from './components/ProviderMatrixModal';
+import { CinematicJudgeMode } from './components/CinematicJudgeMode';
 import { McpTracePanel } from './components/McpTracePanel';
 import { GovernanceLedger } from './components/GovernanceLedger';
 
@@ -23,26 +27,49 @@ export const App: React.FC = () => {
   const [selectedCharacterId, setSelectedCharacterId] = useState<string>('maya');
   const [selectedLanguage, setSelectedLanguage] = useState<'en' | 'hi'>('en');
   const [selectedRegister, setSelectedRegister] = useState<string>('technical');
-  const [viewMode, setViewMode] = useState<'studio' | 'live' | 'evolution' | 'knowledge'>('studio');
+  const getInitialPage = (): 'home' | 'studio' | 'live' | 'evolution' | 'knowledge' => {
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash.replace('#', '');
+      if (['home', 'studio', 'live', 'evolution', 'knowledge'].includes(hash)) {
+        return hash as any;
+      }
+    }
+    return 'home';
+  };
+
+  const [viewMode, setViewMode] = useState<'home' | 'studio' | 'live' | 'evolution' | 'knowledge'>(getInitialPage());
+  const [showJudgeMode, setShowJudgeMode] = useState(false);
   const [commandInput, setCommandInput] = useState<string>(
     "Create a 60-second product launch for Indian developers. Research our documentation first. Do not make unsupported claims. Produce English and Hindi versions."
   );
+
+  // Collapsible drawers (collapsed by default for ultra-clean look)
+  const [showCast, setShowCast] = useState(false);
+  const [showTimeline, setShowTimeline] = useState(false);
+  const [showDemoGuide, setShowDemoGuide] = useState(false);
+
+  const navigateTo = (page: 'home' | 'studio' | 'live' | 'evolution' | 'knowledge') => {
+    setViewMode(page);
+    if (typeof window !== 'undefined') {
+      window.location.hash = page;
+    }
+  };
 
   const [campaignData, setCampaignData] = useState<any>(null);
   const [isExecuting, setIsExecuting] = useState(false);
   const [activeSceneNo, setActiveSceneNo] = useState<number>(1);
   const [demoStep, setDemoStep] = useState<number>(2);
-  // Sub-view within the ClickHouse & MCP workspace.
-  const [evidenceTab, setEvidenceTab] = useState<'evolution' | 'trace' | 'governance'>('trace');
 
   // Modals
   const [dnaModalCharId, setDnaModalCharId] = useState<string | null>(null);
   const [showCompilerModal, setShowCompilerModal] = useState(false);
   const [showProviderMatrixModal, setShowProviderMatrixModal] = useState(false);
-  // Honest provider tally: how many subsystems are backed by a real service right
-  // now, out of how many exist. Previously hardcoded as "11/11", which claimed
-  // every provider was live regardless of configuration.
+  // Honest provider tally: how many subsystems are backed by a real service
+  // right now, out of how many exist. Previously hardcoded as 11/11, which
+  // claimed every provider was live regardless of configuration.
   const [providerCounts, setProviderCounts] = useState<{ live: number; total: number } | null>(null);
+  // Sub-view within the analytics workspace.
+  const [evidenceTab, setEvidenceTab] = useState<'evolution' | 'trace' | 'governance'>('trace');
 
   useEffect(() => {
     fetch('/api/cast')
@@ -64,8 +91,18 @@ export const App: React.FC = () => {
       })
       .catch(console.error);
 
-    // Initial autonomous production run to populate studio stage
+    // Initial autonomous production run to populate studio stage in background
     runProduction({ injectClaimFail: false, injectEmotionFail: false, simulateRightsFail: false });
+
+    // Sync hash changes with viewMode
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace('#', '');
+      if (['home', 'studio', 'live', 'evolution', 'knowledge'].includes(hash)) {
+        setViewMode(hash as any);
+      }
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
   const runProduction = async (opts: {
@@ -245,44 +282,53 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100vw', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100vw', overflow: 'hidden', backgroundColor: 'var(--color-background)' }}>
+      {/* Official Google 4-Color Accent Line */}
+      <div className="google-accent-line" />
       
       {/* Top Navigation Bar */}
       <header style={{
         height: '56px',
         borderBottom: '1px solid var(--border-subtle)',
-        backgroundColor: 'var(--bg-darkest)',
+        backgroundColor: 'var(--color-surface)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '0 20px',
+        padding: '0 24px',
         flexShrink: 0
       }}>
         {/* Brand */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div
+          onClick={() => navigateTo('home')}
+          style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', userSelect: 'none' }}
+          title="Go to AvatarOS Home"
+        >
           <div style={{
-            width: '28px',
-            height: '28px',
-            borderRadius: '6px',
-            background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)',
+            width: '32px',
+            height: '32px',
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg, #1A73E8 0%, #174EA6 100%)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             color: 'white',
-            fontWeight: 900,
-            fontSize: '15px'
+            fontWeight: 800,
+            fontSize: '16px',
+            boxShadow: '0 2px 8px rgba(26, 115, 232, 0.4)'
           }}>
             A
           </div>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <h1 style={{ fontSize: '15px', fontWeight: 900, letterSpacing: '0.5px' }}>
-                AVATAR<span style={{ color: 'var(--primary-light)' }}>OS</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h1 style={{ fontSize: '16px', fontWeight: 600, letterSpacing: '-0.2px', fontFamily: 'Google Sans, -apple-system, sans-serif' }}>
+                Avatar<span style={{ color: 'var(--color-primary)' }}>OS</span>
               </h1>
-              <span className="badge-neon badge-primary" style={{ fontSize: '9px', padding: '0 5px' }}>AUTONOMOUS STUDIO</span>
+              <span className="badge-neon badge-primary" style={{ fontSize: '9px', padding: '1px 8px' }}>
+                ENTERPRISE
+              </span>
             </div>
-            <p style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
-              Create a digital actor once. Direct them forever.
+            <p style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>
+              Autonomous Digital Human Operating System
             </p>
           </div>
         </div>
@@ -290,20 +336,37 @@ export const App: React.FC = () => {
         {/* View Mode Switcher */}
         <div style={{
           display: 'flex',
-          backgroundColor: 'var(--bg-surface)',
+          backgroundColor: 'var(--color-background)',
           padding: '3px',
-          borderRadius: 'var(--radius-md)',
+          borderRadius: 'var(--radius-full)',
           border: '1px solid var(--border-subtle)',
           gap: '4px'
         }}>
           <button
             className="btn"
-            onClick={() => setViewMode('studio')}
+            onClick={() => navigateTo('home')}
             style={{
-              padding: '6px 14px',
+              padding: '6px 16px',
               fontSize: '12px',
-              backgroundColor: viewMode === 'studio' ? 'var(--primary)' : 'transparent',
-              color: viewMode === 'studio' ? 'white' : 'var(--text-muted)'
+              borderRadius: 'var(--radius-full)',
+              backgroundColor: viewMode === 'home' ? 'var(--color-primary)' : 'transparent',
+              color: viewMode === 'home' ? 'var(--color-on-primary)' : 'var(--text-muted)',
+              fontWeight: viewMode === 'home' ? 600 : 500
+            }}
+          >
+            <Home size={13} />
+            Home
+          </button>
+          <button
+            className="btn"
+            onClick={() => navigateTo('studio')}
+            style={{
+              padding: '6px 16px',
+              fontSize: '12px',
+              borderRadius: 'var(--radius-full)',
+              backgroundColor: viewMode === 'studio' ? 'var(--color-primary)' : 'transparent',
+              color: viewMode === 'studio' ? 'var(--color-on-primary)' : 'var(--text-muted)',
+              fontWeight: viewMode === 'studio' ? 600 : 500
             }}
           >
             <Film size={13} />
@@ -311,38 +374,44 @@ export const App: React.FC = () => {
           </button>
           <button
             className="btn"
-            onClick={() => setViewMode('live')}
+            onClick={() => navigateTo('live')}
             style={{
-              padding: '6px 14px',
+              padding: '6px 16px',
               fontSize: '12px',
-              backgroundColor: viewMode === 'live' ? 'var(--primary)' : 'transparent',
-              color: viewMode === 'live' ? 'white' : 'var(--text-muted)'
+              borderRadius: 'var(--radius-full)',
+              backgroundColor: viewMode === 'live' ? 'var(--color-primary)' : 'transparent',
+              color: viewMode === 'live' ? 'var(--color-on-primary)' : 'var(--text-muted)',
+              fontWeight: viewMode === 'live' ? 600 : 500
             }}
           >
             <MessageSquare size={13} />
-            Live Mode
+            Live Mode (Realtime)
           </button>
           <button
             className="btn"
-            onClick={() => setViewMode('evolution')}
+            onClick={() => navigateTo('evolution')}
             style={{
-              padding: '6px 14px',
+              padding: '6px 16px',
               fontSize: '12px',
-              backgroundColor: viewMode === 'evolution' ? 'var(--primary)' : 'transparent',
-              color: viewMode === 'evolution' ? 'white' : 'var(--text-muted)'
+              borderRadius: 'var(--radius-full)',
+              backgroundColor: viewMode === 'evolution' ? 'var(--color-primary)' : 'transparent',
+              color: viewMode === 'evolution' ? 'var(--color-on-primary)' : 'var(--text-muted)',
+              fontWeight: viewMode === 'evolution' ? 600 : 500
             }}
           >
             <Database size={13} />
-            ClickHouse &amp; MCP
+            Analytics &amp; ClickHouse
           </button>
           <button
             className="btn"
-            onClick={() => setViewMode('knowledge')}
+            onClick={() => navigateTo('knowledge')}
             style={{
-              padding: '6px 14px',
+              padding: '6px 16px',
               fontSize: '12px',
-              backgroundColor: viewMode === 'knowledge' ? 'var(--primary)' : 'transparent',
-              color: viewMode === 'knowledge' ? 'white' : 'var(--text-muted)'
+              borderRadius: 'var(--radius-full)',
+              backgroundColor: viewMode === 'knowledge' ? 'var(--color-primary)' : 'transparent',
+              color: viewMode === 'knowledge' ? 'var(--color-on-primary)' : 'var(--text-muted)',
+              fontWeight: viewMode === 'knowledge' ? 600 : 500
             }}
           >
             <BookOpen size={13} />
@@ -354,81 +423,82 @@ export const App: React.FC = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '11px' }}>
           <button
             className="btn btn-secondary"
-            style={{ padding: '4px 8px', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '4px', borderColor: 'rgba(99, 102, 241, 0.4)', color: 'var(--primary-light)' }}
+            style={{ padding: '5px 12px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '6px', borderRadius: 'var(--radius-full)' }}
             onClick={() => setShowProviderMatrixModal(true)}
           >
-            <Cloud size={12} />
-            Providers &amp; Cloud{providerCounts ? ` (${providerCounts.live}/${providerCounts.total} live)` : ''}
+            <Cloud size={13} color="var(--color-primary)" />
+            Cloud Infrastructure{providerCounts ? ` (${providerCounts.live}/${providerCounts.total} Live)` : ''}
           </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <div className="status-dot active" />
-            <span style={{ color: 'var(--text-secondary)' }}>{currentCharacter.name} {currentCharacter.version} (DNA Locked)</span>
+            <span style={{ color: 'var(--text-secondary)' }}>{currentCharacter.name} {currentCharacter.version} (DNA Sealed)</span>
           </div>
           <button
             className="btn btn-secondary"
-            style={{ padding: '4px 8px', fontSize: '10px' }}
+            style={{ padding: '5px 12px', fontSize: '11px', borderRadius: 'var(--radius-full)' }}
             onClick={() => setDnaModalCharId(selectedCharacterId)}
           >
-            <Dna size={12} />
+            <Dna size={13} color="var(--color-primary)" />
             DNA Inspector
+          </button>
+          <button
+            className="btn btn-secondary"
+            style={{
+              padding: '5px 12px',
+              fontSize: '11px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              borderRadius: 'var(--radius-full)',
+              border: showDemoGuide ? '1px solid var(--google-blue)' : '1px solid var(--border-subtle)',
+              backgroundColor: showDemoGuide ? 'rgba(26, 115, 232, 0.08)' : 'var(--color-surface)',
+              color: showDemoGuide ? 'var(--google-blue)' : 'var(--text-secondary)'
+            }}
+            onClick={() => setShowDemoGuide(!showDemoGuide)}
+            title="9-Step Autonomous Demo Walkthrough"
+          >
+            <Sparkles size={12} color={showDemoGuide ? "var(--google-blue)" : "var(--color-primary)"} />
+            <span>9-Step Demo</span>
+          </button>
+          <button
+            className="btn judge-mode-btn"
+            style={{
+              padding: '6px 14px',
+              fontSize: '11px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              borderRadius: 'var(--radius-full)',
+              background: 'linear-gradient(135deg, #1A73E8 0%, #174EA6 100%)',
+              color: '#FFFFFF',
+              boxShadow: '0 2px 8px rgba(26, 115, 232, 0.4)'
+            }}
+            onClick={() => setShowJudgeMode(true)}
+            title="Open Cinematic Judge Walkthrough"
+          >
+            <Award size={14} color="#FFD700" />
+            <span>JUDGE MODE</span>
+            <span style={{ backgroundColor: 'rgba(255,255,255,0.25)', padding: '1px 6px', borderRadius: '9999px', fontSize: '9px' }}>
+              TOUR
+            </span>
           </button>
         </div>
       </header>
 
-      {/* Section 3: Single-Action Production Creation Bar */}
+      {/* Google Search-Style Production Creation Bar */}
       {viewMode === 'studio' && (
         <div style={{
-          padding: '10px 20px',
-          backgroundColor: 'var(--bg-base)',
+          padding: '12px 24px',
+          backgroundColor: 'var(--color-background)',
           borderBottom: '1px solid var(--border-subtle)',
           display: 'flex',
           alignItems: 'center',
           gap: '12px'
         }}>
-          {/* Language Selector */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <Globe size={13} color="var(--primary-light)" />
-            <select
-              value={selectedLanguage}
-              onChange={(e) => setSelectedLanguage(e.target.value as 'en' | 'hi')}
-              style={{
-                backgroundColor: 'var(--bg-surface)',
-                border: '1px solid var(--border-subtle)',
-                borderRadius: 'var(--radius-sm)',
-                padding: '5px 8px',
-                color: 'white',
-                fontSize: '11px',
-                outline: 'none'
-              }}
-            >
-              <option value="en">English (EN)</option>
-              <option value="hi">Hindi (HI)</option>
-            </select>
-          </div>
-
-          {/* Register Selector */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <select
-              value={selectedRegister}
-              onChange={(e) => setSelectedRegister(e.target.value)}
-              style={{
-                backgroundColor: 'var(--bg-surface)',
-                border: '1px solid var(--border-subtle)',
-                borderRadius: 'var(--radius-sm)',
-                padding: '5px 8px',
-                color: 'white',
-                fontSize: '11px',
-                outline: 'none'
-              }}
-            >
-              <option value="technical">Register: Technical</option>
-              <option value="conversational">Register: Conversational</option>
-              <option value="executive">Register: Executive</option>
-            </select>
-          </div>
-
-          {/* Input Brief */}
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', position: 'relative' }}>
+          {/* Main Prompt Bar Container */}
+          <div className="google-prompt-bar" style={{ flex: 1 }}>
+            <Sparkles size={16} color="var(--google-blue)" style={{ marginRight: '8px', flexShrink: 0 }} />
+            
             <input
               type="text"
               value={commandInput}
@@ -436,149 +506,389 @@ export const App: React.FC = () => {
               placeholder="Enter production brief (character, goal, audience, language)..."
               style={{
                 width: '100%',
-                backgroundColor: 'var(--bg-surface)',
-                border: '1px solid var(--border-subtle)',
-                borderRadius: 'var(--radius-sm)',
-                padding: '7px 12px',
-                color: 'white',
-                fontSize: '12px',
-                outline: 'none'
+                backgroundColor: 'transparent',
+                border: 'none',
+                color: 'var(--color-neutral)',
+                fontSize: '13px',
+                outline: 'none',
+                fontFamily: 'Roboto, sans-serif'
               }}
             />
-          </div>
 
-          {/* CREATE PRODUCTION Action Button */}
-          <button
-            className="btn btn-primary"
-            onClick={() => runProduction({})}
-            disabled={isExecuting}
-            style={{ padding: '7px 18px', fontSize: '12px', fontWeight: 700 }}
-          >
-            {isExecuting ? <RefreshCw size={14} className="animate-spin" /> : <Sparkles size={14} />}
-            CREATE PRODUCTION
-          </button>
-        </div>
-      )}
-
-      {/* Main Workspace Body */}
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-        {viewMode === 'studio' && (
-          <>
-            <DigitalCast
-              cast={cast}
-              selectedId={selectedCharacterId}
-              onSelect={setSelectedCharacterId}
-              onOpenCompiler={() => setShowCompilerModal(true)}
-              onOpenDnaModal={(id) => setDnaModalCharId(id)}
-            />
-
-            <LiveStage
-              videoUrl={campaignData?.master_video_url || "/media/master_video_en.mp4"}
-              hindiVideoUrl={campaignData?.hindi_production?.video_url}
-              characterName={currentCharacter.name}
-              characterVersion={currentCharacter.version}
-              activeSceneNo={activeSceneNo}
-              targetEmotion={activeShot.target_emotion}
-              energy={activeShot.emotional_intensity}
-              c2paManifestHash={campaignData?.publish_result?.provenance?.c2pa_manifest_hash}
-              mediaSha256={campaignData?.media_sha256}
-              repurposedClips={campaignData?.repurposed_clips}
-            />
-
-            <AgentActivity
-              campaignData={campaignData}
-              onTriggerClaimFailure={handleDemoClaimBlock}
-              onResolveClaim={handleResolveClaim}
-              onTriggerEmotionFailure={handleDemoGuardianFailure}
-              onTriggerRightsFailure={handleDemoRightsBlock}
-              onReworkScene={handleReworkScene}
-              isExecuting={isExecuting}
-            />
-          </>
-        )}
-
-        {viewMode === 'live' && (
-          <LiveModeChat onHandoffToStudio={handleLiveHandoffToStudio} />
-        )}
-
-        {viewMode === 'evolution' && (
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: '14px', gap: '12px' }}>
-            {/* Evidence sub-navigation: the runtime proof, the audit trail, and the loop they feed. */}
-            <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-              {([
-                { key: 'trace', label: 'MCP Trace', icon: <Terminal size={13} /> },
-                { key: 'governance', label: 'Governance Ledger', icon: <Shield size={13} /> },
-                { key: 'evolution', label: 'Evolution Loop', icon: <RefreshCw size={13} /> }
-              ] as const).map((tab) => (
-                <button
-                  key={tab.key}
-                  className="btn"
-                  onClick={() => setEvidenceTab(tab.key)}
+            {/* Language & Register Controls Embedded */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingRight: '4px', flexShrink: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Globe size={13} color="var(--color-primary)" />
+                <select
+                  value={selectedLanguage}
+                  onChange={(e) => setSelectedLanguage(e.target.value as 'en' | 'hi')}
                   style={{
-                    padding: '7px 14px',
-                    fontSize: '11.5px',
-                    fontWeight: 700,
-                    backgroundColor: evidenceTab === tab.key ? 'var(--primary)' : 'var(--bg-surface)',
-                    color: evidenceTab === tab.key ? 'white' : 'var(--text-muted)',
-                    border: '1px solid var(--border-subtle)'
+                    backgroundColor: 'var(--color-surface-elevated)',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: 'var(--radius-full)',
+                    padding: '4px 8px',
+                    color: 'var(--color-neutral)',
+                    fontSize: '11px',
+                    outline: 'none',
+                    cursor: 'pointer'
                   }}
                 >
-                  {tab.icon}
-                  {tab.label}
-                </button>
-              ))}
+                  <option value="en">EN (Indian)</option>
+                  <option value="hi">HI (Hindi)</option>
+                </select>
+              </div>
+
+              <select
+                value={selectedRegister}
+                onChange={(e) => setSelectedRegister(e.target.value)}
+                style={{
+                  backgroundColor: 'var(--color-surface-elevated)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: 'var(--radius-full)',
+                  padding: '4px 8px',
+                  color: 'var(--color-neutral)',
+                  fontSize: '11px',
+                  outline: 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                <option value="technical">Register: Technical</option>
+                <option value="conversational">Register: Conversational</option>
+                <option value="executive">Register: Executive</option>
+              </select>
+            </div>
+          </div>
+
+            {/* Studio Panel Toggles (Digital Cast & Production Timeline) */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+              <button
+                onClick={() => setShowCast(!showCast)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '7px 14px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  borderRadius: 'var(--radius-full)',
+                  border: showCast ? '1px solid var(--google-blue)' : '1px solid var(--border-subtle)',
+                  backgroundColor: showCast ? 'rgba(26, 115, 232, 0.08)' : 'var(--color-surface)',
+                  color: showCast ? 'var(--google-blue)' : 'var(--text-secondary)',
+                  transition: 'all 0.2s ease',
+                  cursor: 'pointer'
+                }}
+                title="Toggle Digital Cast (Actors & DNA)"
+              >
+                <Users size={14} color={showCast ? 'var(--google-blue)' : 'var(--text-secondary)'} />
+                <span>Cast</span>
+                <span className="badge-neon badge-primary" style={{ padding: '1px 6px', fontSize: '10px' }}>
+                  {cast.length || 4}
+                </span>
+              </button>
+
+              <button
+                onClick={() => setShowTimeline(!showTimeline)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '7px 14px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  borderRadius: 'var(--radius-full)',
+                  border: showTimeline ? '1px solid var(--google-blue)' : '1px solid var(--border-subtle)',
+                  backgroundColor: showTimeline ? 'rgba(26, 115, 232, 0.08)' : 'var(--color-surface)',
+                  color: showTimeline ? 'var(--google-blue)' : 'var(--text-secondary)',
+                  transition: 'all 0.2s ease',
+                  cursor: 'pointer'
+                }}
+                title="Toggle Production Timeline"
+              >
+                <Film size={14} color={showTimeline ? 'var(--google-blue)' : 'var(--text-secondary)'} />
+                <span>Timeline</span>
+                <span className="badge-neon badge-primary" style={{ padding: '1px 6px', fontSize: '10px' }}>
+                  {campaignData?.director_plan?.shots?.length || 5}s
+                </span>
+              </button>
             </div>
 
-            <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
-              {evidenceTab === 'trace' && <McpTracePanel />}
-              {evidenceTab === 'governance' && <GovernanceLedger />}
-              {evidenceTab === 'evolution' && (
-                <div style={{ height: '100%', overflowY: 'auto' }}>
-                  <ClickHouseEvolution />
-                </div>
-              )}
-            </div>
+            {/* CREATE PRODUCTION Action Button */}
+            <button
+              className="btn btn-primary"
+              onClick={() => runProduction({})}
+              disabled={isExecuting}
+              style={{ padding: '8px 22px', fontSize: '13px', fontWeight: 600, flexShrink: 0 }}
+            >
+              {isExecuting ? <RefreshCw size={14} className="animate-spin" /> : <Sparkles size={14} />}
+              CREATE PRODUCTION
+            </button>
           </div>
         )}
 
-        {viewMode === 'knowledge' && (
-          <KnowledgeRetrieval />
-        )}
+      {/* Main Workspace Body with Framer Motion transitions */}
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
+        <AnimatePresence mode="wait">
+          {viewMode === 'home' && (
+            <motion.div
+              key="home"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.2 }}
+              style={{ flex: 1, display: 'flex', overflow: 'hidden' }}
+            >
+              <HomePage
+                onNavigate={(page) => {
+                  if (page === 'cast') {
+                    navigateTo('studio');
+                  } else {
+                    navigateTo(page);
+                  }
+                }}
+                onOpenJudgeMode={() => setShowJudgeMode(true)}
+                onInspectDna={() => setDnaModalCharId(selectedCharacterId || 'maya')}
+                onLaunchPreset={(brief) => {
+                  setCommandInput(brief);
+                  navigateTo('studio');
+                  runProduction({ customBrief: brief });
+                }}
+                onTriggerClaimDemo={() => {
+                  navigateTo('studio');
+                  handleDemoClaimBlock();
+                }}
+              />
+            </motion.div>
+          )}
+
+          {viewMode === 'studio' && (
+            <motion.div
+              key="studio"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.2 }}
+              style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}
+            >
+              {/* Digital Cast Sliding Drawer */}
+              <AnimatePresence initial={false}>
+                {showCast && (
+                  <motion.div
+                    key="cast-drawer"
+                    initial={{ width: 0, opacity: 0 }}
+                    animate={{ width: 280, opacity: 1 }}
+                    exit={{ width: 0, opacity: 0 }}
+                    transition={{ duration: 0.25, ease: [0.2, 0, 0, 1] }}
+                    style={{ overflow: 'hidden', height: '100%', flexShrink: 0, zIndex: 15 }}
+                  >
+                    <DigitalCast
+                      cast={cast}
+                      selectedId={selectedCharacterId}
+                      onSelect={setSelectedCharacterId}
+                      onOpenCompiler={() => setShowCompilerModal(true)}
+                      onOpenDnaModal={(id) => setDnaModalCharId(id)}
+                      onClose={() => setShowCast(false)}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <LiveStage
+                videoUrl={campaignData?.master_video_url || "/media/master_video_en.mp4"}
+                hindiVideoUrl={campaignData?.hindi_production?.video_url}
+                characterName={currentCharacter.name}
+                characterVersion={currentCharacter.version}
+                activeSceneNo={activeSceneNo}
+                targetEmotion={activeShot.target_emotion}
+                energy={activeShot.emotional_intensity}
+                c2paManifestHash={campaignData?.publish_result?.provenance?.c2pa_manifest_hash}
+                mediaSha256={campaignData?.media_sha256}
+                repurposedClips={campaignData?.repurposed_clips}
+                showCast={showCast}
+                onToggleCast={() => setShowCast(!showCast)}
+                castCount={cast.length || 4}
+              />
+
+              <AgentActivity
+                campaignData={campaignData}
+                onTriggerClaimFailure={handleDemoClaimBlock}
+                onResolveClaim={handleResolveClaim}
+                onTriggerEmotionFailure={handleDemoGuardianFailure}
+                onTriggerRightsFailure={handleDemoRightsBlock}
+                onReworkScene={handleReworkScene}
+                isExecuting={isExecuting}
+              />
+            </motion.div>
+          )}
+
+          {viewMode === 'live' && (
+            <motion.div
+              key="live"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.2 }}
+              style={{ flex: 1, display: 'flex', overflow: 'hidden' }}
+            >
+              <LiveModeChat onHandoffToStudio={handleLiveHandoffToStudio} />
+            </motion.div>
+          )}
+
+          {viewMode === 'evolution' && (
+            <motion.div
+              key="evolution"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.2 }}
+              style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: '14px', gap: '12px' }}
+            >
+              {/* The runtime proof, the audit trail, and the loop they feed. */}
+              <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                {([
+                  { key: 'trace', label: 'MCP Trace', icon: <Terminal size={13} /> },
+                  { key: 'governance', label: 'Governance Ledger', icon: <Shield size={13} /> },
+                  { key: 'evolution', label: 'Evolution Loop', icon: <RefreshCw size={13} /> }
+                ] as const).map((tab) => (
+                  <button
+                    key={tab.key}
+                    className="btn"
+                    onClick={() => setEvidenceTab(tab.key)}
+                    style={{
+                      padding: '7px 16px',
+                      fontSize: '12px',
+                      borderRadius: 'var(--radius-full)',
+                      fontWeight: evidenceTab === tab.key ? 600 : 500,
+                      backgroundColor: evidenceTab === tab.key ? 'var(--color-primary)' : 'transparent',
+                      color: evidenceTab === tab.key ? 'var(--color-on-primary)' : 'var(--text-muted)'
+                    }}
+                  >
+                    {tab.icon}
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+                {evidenceTab === 'trace' && <McpTracePanel />}
+                {evidenceTab === 'governance' && <GovernanceLedger />}
+                {evidenceTab === 'evolution' && (
+                  <div style={{ height: '100%', overflowY: 'auto' }}>
+                    <ClickHouseEvolution />
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
+
+          {viewMode === 'knowledge' && (
+            <motion.div
+              key="knowledge"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.2 }}
+              style={{ flex: 1, display: 'flex', overflow: 'hidden' }}
+            >
+              <KnowledgeRetrieval />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
-      {/* Bottom Production Timeline (Only in Studio Mode) */}
+      {/* Bottom Production Timeline Dock Bar (Only in Studio Mode) */}
       {viewMode === 'studio' && (
-        <ProductionTimeline
-          shots={campaignData?.director_plan?.shots || []}
-          activeSceneNo={activeSceneNo}
-          onSelectScene={setActiveSceneNo}
-          failedScenes={campaignData?.guardian_report?.failed_scenes}
-          isBlocked={campaignData?.publish_result?.status === 'BLOCKED'}
-        />
+        <>
+          <AnimatePresence>
+            {showTimeline && (
+              <motion.div
+                key="studio-timeline-footer"
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.25, ease: [0.2, 0, 0, 1] }}
+                style={{ overflow: 'hidden', flexShrink: 0 }}
+              >
+                <ProductionTimeline
+                  shots={campaignData?.director_plan?.shots || []}
+                  activeSceneNo={activeSceneNo}
+                  onSelectScene={setActiveSceneNo}
+                  failedScenes={campaignData?.guardian_report?.failed_scenes}
+                  isBlocked={campaignData?.publish_result?.status === 'BLOCKED'}
+                  onClose={() => setShowTimeline(false)}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {!showTimeline && (
+            <div
+              onClick={() => setShowTimeline(true)}
+              style={{
+                height: '28px',
+                borderTop: '1px solid var(--border-subtle)',
+                backgroundColor: 'var(--color-surface)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                flexShrink: 0,
+                zIndex: 10
+              }}
+              title="Expand Production Timeline"
+            >
+              <button
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  color: 'var(--text-secondary)',
+                  cursor: 'pointer'
+                }}
+              >
+                <Film size={12} color="var(--google-blue)" />
+                <span>Production Timeline ({campaignData?.director_plan?.shots?.length || 5} Scenes)</span>
+                <ChevronUp size={12} />
+              </button>
+            </div>
+          )}
+        </>
       )}
 
-      {/* Floating 9-Step Demo Walkthrough Guide */}
+      {/* Floating 9-Step Demo Walkthrough Guide (Toggled on demand from top navbar) */}
       <DemoGuide
+        isOpen={showDemoGuide}
+        onClose={() => setShowDemoGuide(false)}
         currentStep={demoStep}
         onSelectStep={(step) => {
           setDemoStep(step);
-          if (step === 1) setDnaModalCharId('maya');
-          if (step === 2) setViewMode('studio');
-          if (step === 3) setViewMode('studio');
-          if (step === 6) setViewMode('studio');
-          if (step === 7) setViewMode('live');
-          if (step === 8 || step === 9) setViewMode('evolution');
+          if (step === 1) {
+            setShowCast(true);
+            setDnaModalCharId('maya');
+          }
+          if (step === 2) navigateTo('studio');
+          if (step === 3) navigateTo('studio');
+          if (step === 6) {
+            setShowTimeline(true);
+            navigateTo('studio');
+          }
+          if (step === 7) navigateTo('live');
+          if (step === 8 || step === 9) navigateTo('evolution');
         }}
         onExecuteFullRun={() => {
-          setViewMode('studio');
+          navigateTo('studio');
           runProduction({});
         }}
         onTriggerClaimFail={handleDemoClaimBlock}
         onResolveClaim={handleResolveClaim}
         onTriggerEmotionFail={handleDemoGuardianFailure}
         onReworkScene={handleReworkScene}
-        onOpenLiveMode={() => setViewMode('live')}
-        onOpenEvolution={() => setViewMode('evolution')}
+        onOpenLiveMode={() => navigateTo('live')}
+        onOpenEvolution={() => navigateTo('evolution')}
       />
 
       {/* Modals */}
@@ -592,6 +902,40 @@ export const App: React.FC = () => {
 
       {showProviderMatrixModal && (
         <ProviderMatrixModal isOpen={showProviderMatrixModal} onClose={() => setShowProviderMatrixModal(false)} />
+      )}
+
+      {showJudgeMode && (
+        <CinematicJudgeMode
+          isOpen={showJudgeMode}
+          onClose={() => setShowJudgeMode(false)}
+          onInspectDna={() => {
+            setShowJudgeMode(false);
+            setDnaModalCharId('maya');
+          }}
+          onRunProduction={() => {
+            setShowJudgeMode(false);
+            navigateTo('studio');
+            runProduction({});
+          }}
+          onTriggerClaimFail={() => {
+            setShowJudgeMode(false);
+            navigateTo('studio');
+            handleDemoClaimBlock();
+          }}
+          onResolveClaim={() => {
+            setShowJudgeMode(false);
+            navigateTo('studio');
+            handleResolveClaim();
+          }}
+          onOpenLiveMode={() => {
+            setShowJudgeMode(false);
+            navigateTo('live');
+          }}
+          onOpenEvolution={() => {
+            setShowJudgeMode(false);
+            navigateTo('evolution');
+          }}
+        />
       )}
     </div>
   );

@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { ShieldCheck, Sparkles, Sliders, Dna, FileCheck, CheckCircle2, AlertCircle } from 'lucide-react';
+import React from 'react';
+import { ShieldCheck, Sparkles, Sliders, Dna, FileCheck, CheckCircle2, AlertCircle, X } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 interface CastMember {
   character_id: string;
@@ -19,6 +20,7 @@ interface DigitalCastProps {
   onSelect: (id: string) => void;
   onOpenCompiler: () => void;
   onOpenDnaModal: (characterId: string) => void;
+  onClose?: () => void;
 }
 
 export const DigitalCast: React.FC<DigitalCastProps> = ({
@@ -27,12 +29,13 @@ export const DigitalCast: React.FC<DigitalCastProps> = ({
   onSelect,
   onOpenCompiler,
   onOpenDnaModal,
+  onClose
 }) => {
   return (
     <aside style={{
       width: '280px',
       borderRight: '1px solid var(--border-subtle)',
-      backgroundColor: 'var(--bg-base)',
+      backgroundColor: 'var(--color-surface)',
       display: 'flex',
       flexDirection: 'column',
       height: '100%',
@@ -48,26 +51,46 @@ export const DigitalCast: React.FC<DigitalCastProps> = ({
       }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '13px', fontWeight: 700, letterSpacing: '1px', color: 'var(--text-secondary)' }}>
+            <span style={{ fontSize: '13px', fontWeight: 700, letterSpacing: '0.5px', color: 'var(--text-secondary)' }}>
               DIGITAL CAST
             </span>
-            <span className="badge-neon badge-primary" style={{ padding: '1px 6px', fontSize: '10px' }}>
+            <span className="badge-neon badge-primary" style={{ padding: '2px 8px', fontSize: '10px' }}>
               {cast.length} ACTORS
             </span>
           </div>
           <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-            Persistent Digital Identities
+            Persistent Identities &amp; DNA
           </p>
         </div>
-        <button
-          className="btn btn-secondary"
-          style={{ padding: '6px 10px', fontSize: '11px' }}
-          onClick={onOpenCompiler}
-          title="Compile New Character"
-        >
-          <Sparkles size={13} color="var(--primary-light)" />
-          Compile
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <button
+            className="btn btn-secondary"
+            style={{ padding: '6px 12px', fontSize: '11px', borderRadius: 'var(--radius-full)' }}
+            onClick={onOpenCompiler}
+          >
+            <Sparkles size={12} color="var(--color-primary)" />
+            Compile
+          </button>
+          {onClose && (
+            <button
+              onClick={onClose}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                color: 'var(--text-muted)',
+                padding: '4px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              title="Close Cast Panel"
+            >
+              <X size={16} />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Cast List */}
@@ -75,31 +98,27 @@ export const DigitalCast: React.FC<DigitalCastProps> = ({
         {cast.map((c) => {
           const isSelected = c.character_id === selectedId;
           const avatarGradients: Record<string, string> = {
-            maya: 'linear-gradient(135deg, #6366F1 0%, #A855F7 100%)',
-            aria: 'linear-gradient(135deg, #0EA5E9 0%, #2563EB 100%)',
-            david: 'linear-gradient(135deg, #334155 0%, #0F172A 100%)',
-            nova: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+            maya: 'linear-gradient(135deg, #4285F4 0%, #1A73E8 100%)', // Google Blue
+            aria: 'linear-gradient(135deg, #EA4335 0%, #C5221F 100%)', // Google Red
+            david: 'linear-gradient(135deg, #FBBC04 0%, #EA8600 100%)', // Google Yellow
+            nova: 'linear-gradient(135deg, #34A853 0%, #137333 100%)', // Google Green
           };
 
           return (
-            <div
+            <motion.div
               key={c.character_id}
               onClick={() => onSelect(c.character_id)}
+              whileHover={{ x: 2 }}
+              whileTap={{ scale: 0.99 }}
               style={{
-                backgroundColor: isSelected ? 'var(--bg-surface-elevated)' : 'transparent',
-                border: isSelected ? '1px solid var(--border-focus)' : '1px solid transparent',
+                backgroundColor: isSelected ? 'var(--color-surface-elevated)' : 'transparent',
+                border: isSelected ? '1px solid var(--color-primary)' : '1px solid transparent',
                 borderRadius: 'var(--radius-md)',
                 padding: '12px',
                 marginBottom: '8px',
                 cursor: 'pointer',
-                transition: 'all 0.2s ease',
+                transition: 'background-color 0.2s ease',
                 position: 'relative',
-              }}
-              onMouseEnter={(e) => {
-                if (!isSelected) e.currentTarget.style.backgroundColor = 'var(--bg-surface)';
-              }}
-              onMouseLeave={(e) => {
-                if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent';
               }}
             >
               {isSelected && (
@@ -109,7 +128,7 @@ export const DigitalCast: React.FC<DigitalCastProps> = ({
                   top: '15%',
                   bottom: '15%',
                   width: '3px',
-                  backgroundColor: 'var(--primary)',
+                  backgroundColor: 'var(--color-primary)',
                   borderRadius: '0 2px 2px 0'
                 }} />
               )}
@@ -117,8 +136,8 @@ export const DigitalCast: React.FC<DigitalCastProps> = ({
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 {/* Avatar Initials Circle */}
                 <div style={{
-                  width: '42px',
-                  height: '42px',
+                  width: '40px',
+                  height: '40px',
                   borderRadius: '50%',
                   background: avatarGradients[c.character_id] || avatarGradients.maya,
                   display: 'flex',
@@ -126,8 +145,8 @@ export const DigitalCast: React.FC<DigitalCastProps> = ({
                   justifyContent: 'center',
                   color: 'white',
                   fontWeight: 800,
-                  fontSize: '16px',
-                  boxShadow: isSelected ? '0 0 12px var(--primary-glow)' : 'none',
+                  fontSize: '15px',
+                  boxShadow: isSelected ? '0 0 12px rgba(66, 133, 244, 0.4)' : 'none',
                   flexShrink: 0
                 }}>
                   {c.name[0]}
@@ -135,7 +154,7 @@ export const DigitalCast: React.FC<DigitalCastProps> = ({
 
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontWeight: 700, fontSize: '14px', color: 'var(--text-primary)' }}>
+                    <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text-primary)' }}>
                       {c.name}
                     </span>
                     <span className="badge-neon badge-cyan" style={{ fontSize: '10px', padding: '1px 6px' }}>
@@ -187,7 +206,7 @@ export const DigitalCast: React.FC<DigitalCastProps> = ({
                   DNA
                 </button>
               </div>
-            </div>
+            </motion.div>
           );
         })}
       </div>

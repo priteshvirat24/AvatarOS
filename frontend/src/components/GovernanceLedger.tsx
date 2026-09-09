@@ -144,7 +144,7 @@ export const GovernanceLedger: React.FC = () => {
               disabled={loading}
               style={{ padding: '5px 10px', fontSize: '10px' }}
             >
-              {loading ? <Loader2 size={12} className="spin" /> : <RefreshCw size={12} />}
+              {loading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
               Refresh
             </button>
           </div>
@@ -229,7 +229,7 @@ export const GovernanceLedger: React.FC = () => {
           </div>
         ) : loading ? (
           <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
-            <Loader2 size={22} className="spin" />
+            <Loader2 size={22} className="animate-spin" />
             <p style={{ fontSize: '11px', marginTop: '10px' }}>Querying the governance ledger…</p>
           </div>
         ) : events.length === 0 ? (

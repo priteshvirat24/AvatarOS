@@ -15,8 +15,11 @@ import {
   AlertTriangle,
   RotateCcw,
   CheckCircle2,
-  Cpu
+  Cpu,
+  Layers
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { GoogleLabs3D } from './GoogleLabs3D';
 
 interface TranscriptItem {
   speaker: 'user' | 'assistant';
@@ -149,7 +152,8 @@ export const LiveModeChat: React.FC<LiveModeChatProps> = ({ onHandoffToStudio })
         setProviderInfo((prev) => ({
           ...prev,
           provider: data.provider,
-          model: data.model || 'gemini-2.5-flash',
+          // Report whatever model the backend actually used; do not assume a version.
+          model: data.model || 'gemini',
           degraded_mode: data.degraded_mode ?? false,
           is_realtime: data.is_realtime ?? false,
           ready: true
@@ -520,8 +524,8 @@ export const LiveModeChat: React.FC<LiveModeChatProps> = ({ onHandoffToStudio })
           padding: '20px',
           position: 'relative',
           overflow: 'hidden',
-          backgroundColor: '#000',
-          border: '1px solid var(--border-focus)'
+          backgroundColor: '#FFFFFF',
+          border: '1px solid var(--border-subtle)'
         }}>
           {/* Top HUD: DNA Sealing & Character Version */}
           <div style={{
@@ -545,105 +549,44 @@ export const LiveModeChat: React.FC<LiveModeChatProps> = ({ onHandoffToStudio })
             </span>
           </div>
 
-          {/* Neural Visual Avatar Circle */}
+          {/* 3D Hologram Visualizer */}
           <div style={{
             position: 'relative',
-            width: '200px',
-            height: '200px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
+            width: '100%',
+            height: '240px',
+            borderRadius: 'var(--radius-md)',
+            overflow: 'hidden',
+            marginTop: '28px'
           }}>
-            {/* Pulsing Outer Aura */}
-            <div style={{
-              position: 'absolute',
-              inset: '-20px',
-              borderRadius: '50%',
-              background: sessionStatus === 'SPEAKING'
-                ? 'radial-gradient(circle, rgba(99,102,241,0.4) 0%, transparent 70%)'
-                : sessionStatus === 'THINKING'
-                ? 'radial-gradient(circle, rgba(56,189,248,0.4) 0%, transparent 70%)'
-                : sessionStatus === 'INTERRUPTED'
-                ? 'radial-gradient(circle, rgba(244,63,94,0.4) 0%, transparent 70%)'
-                : 'radial-gradient(circle, rgba(16,185,129,0.2) 0%, transparent 70%)',
-              transition: 'all 0.3s ease',
-              animation: sessionStatus === 'SPEAKING' ? 'pulse 1.5s infinite' : 'none'
-            }} />
-
-            {/* Glowing Border Rings */}
-            <div style={{
-              position: 'absolute',
-              inset: 0,
-              borderRadius: '50%',
-              border: `2px solid ${
-                sessionStatus === 'SPEAKING' ? 'var(--primary-light)' :
-                sessionStatus === 'THINKING' ? 'var(--accent-cyan)' :
-                sessionStatus === 'INTERRUPTED' ? 'var(--accent-rose)' :
-                'var(--border-focus)'
-              }`,
-              boxShadow: sessionStatus === 'SPEAKING' ? '0 0 30px var(--primary-glow)' : 'none',
-              transition: 'all 0.3s ease'
-            }} />
-
-            {/* Avatar Face Graphic / Keypoint Grid */}
-            <div style={{
-              width: '160px',
-              height: '160px',
-              borderRadius: '50%',
-              backgroundColor: 'var(--bg-surface-elevated)',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              position: 'relative',
-              overflow: 'hidden'
-            }}>
-              <img
-                src="/media/maya_avatar_portrait.png"
-                alt="Maya Live Digital Human"
-                onError={(e) => {
-                  // Fallback to SVG avatar if image not found
-                  (e.target as HTMLElement).style.display = 'none';
-                }}
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'cover',
-                  position: 'absolute',
-                  inset: 0
-                }}
-              />
-
-              {/* Fallback Hologram Symbol */}
-              <Cpu size={48} color="var(--primary-light)" style={{ opacity: 0.8 }} />
-
-              {/* Simulated Keypoint Overlay */}
-              <div style={{
-                position: 'absolute',
-                inset: '20px',
-                border: '1px dashed rgba(56,189,248,0.3)',
-                borderRadius: '50%',
-                pointerEvents: 'none'
-              }} />
-            </div>
+            <GoogleLabs3D
+              characterName="Maya"
+              characterVersion="v1.7.0"
+              isSpeaking={sessionStatus === 'SPEAKING'}
+              isListening={sessionStatus === 'LISTENING' || isMicActive}
+              energy={micVolume > 10 ? (micVolume / 100) * 1.5 : 0.78}
+              height="100%"
+            />
 
             {/* Status Floating Pill */}
             <div style={{
               position: 'absolute',
-              bottom: '-12px',
+              bottom: '12px',
+              left: '50%',
+              transform: 'translateX(-50%)',
               padding: '4px 14px',
               borderRadius: '9999px',
-              backgroundColor: 'rgba(11,14,23,0.95)',
+              backgroundColor: 'rgba(19,19,20,0.92)',
               border: '1px solid var(--border-subtle)',
               fontSize: '10px',
               fontWeight: 800,
               letterSpacing: '1px',
               fontFamily: 'var(--font-mono)',
               color:
-                sessionStatus === 'SPEAKING' ? 'var(--primary-light)' :
+                sessionStatus === 'SPEAKING' ? 'var(--color-primary)' :
                 sessionStatus === 'THINKING' ? 'var(--accent-cyan)' :
-                sessionStatus === 'INTERRUPTED' ? 'var(--accent-rose)' :
-                'var(--accent-emerald)'
+                sessionStatus === 'INTERRUPTED' ? 'var(--color-error)' :
+                'var(--color-secondary)',
+              zIndex: 10
             }}>
               {sessionStatus}
             </div>
@@ -963,13 +906,13 @@ export const LiveModeChat: React.FC<LiveModeChatProps> = ({ onHandoffToStudio })
                   maxWidth: '80%',
                   padding: '12px 16px',
                   borderRadius: 'var(--radius-lg)',
-                  backgroundColor: isMaya ? 'var(--bg-surface-elevated)' : 'var(--primary)',
+                  backgroundColor: isMaya ? 'var(--color-surface-variant)' : 'var(--color-primary)',
                   border: isMaya
                     ? t.is_deflection
                       ? '1px solid var(--accent-amber)'
                       : '1px solid var(--border-subtle)'
                     : 'none',
-                  color: 'var(--text-primary)',
+                  color: isMaya ? 'var(--text-primary)' : '#FFFFFF',
                   fontSize: '13px',
                   lineHeight: 1.5
                 }}>

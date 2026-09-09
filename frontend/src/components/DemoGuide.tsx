@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { PlayCircle, CheckCircle2, ChevronRight, Sparkles, AlertTriangle, ShieldCheck, Database, Film, MessageSquare, Terminal } from 'lucide-react';
+import React from 'react';
+import { ChevronRight, Sparkles } from 'lucide-react';
 
 interface DemoGuideProps {
   currentStep: number;
@@ -11,6 +11,8 @@ interface DemoGuideProps {
   onReworkScene: () => void;
   onOpenLiveMode: () => void;
   onOpenEvolution: () => void;
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
 export const DemoGuide: React.FC<DemoGuideProps> = ({
@@ -22,12 +24,10 @@ export const DemoGuide: React.FC<DemoGuideProps> = ({
   onTriggerEmotionFail,
   onReworkScene,
   onOpenLiveMode,
-  onOpenEvolution
+  onOpenEvolution,
+  isOpen = false,
+  onClose
 }) => {
-  // Starts minimized. The guide is a floating overlay, so opening it by default
-  // covered the evidence panels it is meant to point at.
-  const [minimized, setMinimized] = useState(true);
-
   const steps = [
     {
       num: 1,
@@ -52,99 +52,95 @@ export const DemoGuide: React.FC<DemoGuideProps> = ({
     },
     {
       num: 4,
-      title: "Trigger Claim Block (Step 4)",
-      desc: "Deliberate claim '3x faster' blocked by Guardian -> Attach benchmark PDF -> Approved!",
+      title: "Trigger Controlled Claim Block",
+      desc: "Simulate ungrounded marketing claim -> Forced safety gate trip -> 100% hard interlock.",
       action: onTriggerClaimFail,
-      btnText: "Trigger Unsupported Claim"
+      btnText: "Trigger Claim Block"
     },
     {
       num: 5,
-      title: "Trigger Emotion Fail (Step 5)",
-      desc: "Scene 4 emotion mismatch -> Guardian flags REWORK -> Regenerates Scene 4 only!",
-      action: onTriggerEmotionFail,
-      btnText: "Trigger Emotion Mismatch"
+      title: "Resolve & Re-verify",
+      desc: "Inject verified factual citation from ground documentation -> Gate clears to green.",
+      action: onResolveClaim,
+      btnText: "Resolve Claim & Re-verify"
     },
     {
       num: 6,
-      title: "Inspect Multi-Asset Output",
-      desc: "Master EN video, Hindi culturally-adapted re-performance, 3 vertical 9:16 Shorts.",
-      action: () => onSelectStep(6),
-      btnText: "View Assets & C2PA"
+      title: "Trigger Guardian Failure",
+      desc: "Simulate emotion/energy mismatch in Scene 2 -> Triggers targeted scene-scoped rework.",
+      action: onTriggerEmotionFail,
+      btnText: "Trigger Emotion Fail"
     },
     {
       num: 7,
-      title: "Test Live Mode",
-      desc: "Talk to Maya in real-time (<800ms). Switch register: Beginner vs CTO while DNA is locked.",
+      title: "Conversational Live Mode",
+      desc: "Low-latency interactive voice call with Maya over the Gemini Live API, falling back to a labelled deterministic cascade.",
       action: onOpenLiveMode,
-      btnText: "Open Live Mode"
+      btnText: "Switch to Live Mode"
     },
     {
       num: 8,
-      title: "ClickHouse Telemetry",
-      desc: "Analyze 1,842 scene impressions across platforms, statistical CI validation.",
+      title: "ClickHouse Real-Time Telemetry",
+      desc: "Sub-second event streaming of latency, cost per second, and identity confidence drift.",
       action: onOpenEvolution,
-      btnText: "Open ClickHouse Loop"
+      btnText: "View Telemetry & Evolution"
     },
     {
       num: 9,
-      title: "Prove Loop Closed (Plan Diff)",
-      desc: "Director Plan visibly diffs between Run #1 and Run #2, citing ClickHouse query.",
+      title: "Persona Evolution & A/B Test",
+      desc: "Analyze conversion feedback -> Generate new persona generation with mutated traits.",
       action: onOpenEvolution,
-      btnText: "View Step 9 Plan Diff"
+      btnText: "Inspect DNA Evolution"
     }
   ];
 
-  if (minimized) {
-    return (
-      <button
-        onClick={() => setMinimized(false)}
-        className="btn btn-primary"
-        style={{
-          position: 'fixed',
-          bottom: '150px',
-          right: '24px',
-          zIndex: 99,
-          boxShadow: '0 8px 30px rgba(0,0,0,0.7)',
-          padding: '8px 16px',
-          fontSize: '12px'
-        }}
-      >
-        <Sparkles size={14} />
-        Open 9-Step Demo Guide
-      </button>
-    );
-  }
+  if (!isOpen) return null;
 
   return (
     <div
-      className="glass-panel"
       style={{
         position: 'fixed',
-        bottom: '150px',
+        top: '68px',
         right: '24px',
         width: '360px',
-        zIndex: 99,
+        maxHeight: 'calc(100vh - 100px)',
+        zIndex: 9999,
         padding: '16px',
+        backgroundColor: 'var(--color-surface-elevated)',
+        border: '1px solid var(--border-subtle)',
+        borderRadius: '16px',
+        boxShadow: '0 12px 36px rgba(0,0,0,0.18), 0 0 0 1px var(--border-focus)',
         display: 'flex',
         flexDirection: 'column',
-        gap: '10px',
-        boxShadow: '0 20px 60px rgba(0,0,0,0.8), 0 0 20px rgba(99,102,241,0.25)',
-        border: '1px solid var(--border-focus)'
+        gap: '10px'
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Sparkles size={16} color="var(--primary-light)" />
-          <span style={{ fontWeight: 800, fontSize: '13px', letterSpacing: '0.5px' }}>
+          <Sparkles size={16} color="var(--google-blue)" />
+          <span style={{ fontWeight: 800, fontSize: '13px', letterSpacing: '0.5px', color: 'var(--text-primary)' }}>
             THE WINNING DEMO (9 STEPS)
           </span>
         </div>
-        <button
-          onClick={() => setMinimized(true)}
-          style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '12px' }}
-        >
-          ✕
-        </button>
+        {onClose && (
+          <button
+            onClick={onClose}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--text-muted)',
+              cursor: 'pointer',
+              fontSize: '14px',
+              padding: '4px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+            title="Close Demo Guide"
+          >
+            ✕
+          </button>
+        )}
       </div>
 
       <div style={{ maxHeight: '280px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px' }}>

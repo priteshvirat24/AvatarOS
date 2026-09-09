@@ -215,7 +215,7 @@ export const McpTracePanel: React.FC = () => {
               disabled={verifying}
               style={{ padding: '5px 10px', fontSize: '10px' }}
             >
-              {verifying ? <Loader2 size={12} className="spin" /> : <RefreshCw size={12} />}
+              {verifying ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
               {verifying ? 'Querying ClickHouse…' : 'Verify from ClickHouse'}
             </button>
           </div>

@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, Pause, RotateCcw, Volume2, Shield, Eye, Layers, Film, FileCode2, Sparkles, CheckCircle2, User, Activity, Video } from 'lucide-react';
+import { Play, Pause, RotateCcw, Volume2, Shield, Eye, Layers, Film, FileCode2, Sparkles, CheckCircle2, User, Activity, Video, Cpu, Box, ChevronRight } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { GoogleLabs3D } from './GoogleLabs3D';
 
 interface LiveStageProps {
   videoUrl: string;
@@ -16,6 +18,9 @@ interface LiveStageProps {
   stageStatus?: 'IDLE' | 'PREPARING' | 'SPEAKING' | 'VERIFYING' | 'APPROVED' | 'BLOCKED';
   rendererProvider?: string;
   voiceProvider?: string;
+  showCast?: boolean;
+  onToggleCast?: () => void;
+  castCount?: number;
 }
 
 export const LiveStage: React.FC<LiveStageProps> = ({
@@ -32,12 +37,16 @@ export const LiveStage: React.FC<LiveStageProps> = ({
   isExecuting = false,
   stageStatus = "APPROVED",
   rendererProvider = "Deterministic Engine (FFmpeg)",
-  voiceProvider = "Deterministic Acoustic Synthesizer"
+  voiceProvider = "Deterministic Acoustic Synthesizer",
+  showCast = false,
+  onToggleCast,
+  castCount = 4
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentLang, setCurrentLang] = useState<'en' | 'hi'>('en');
-  const [activeTab, setActiveTab] = useState<'video' | 'performance_preview' | 'storyboard' | 'repurposed' | 'c2pa'>('video');
+  const [activeTab, setActiveTab] = useState<'video' | '3d_neural_core' | 'performance_preview' | 'storyboard' | 'repurposed' | 'c2pa'>('video');
   const [selectedRepurposedUrl, setSelectedRepurposedUrl] = useState<string | null>(null);
+  const [showPip3D, setShowPip3D] = useState(true);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const activeMediaSrc = selectedRepurposedUrl || (currentLang === 'hi' && hindiVideoUrl ? hindiVideoUrl : videoUrl);
@@ -62,21 +71,16 @@ export const LiveStage: React.FC<LiveStageProps> = ({
     }
   };
 
-  // React does not reliably reflect the `muted` prop onto the DOM element, and an
-  // unmuted element is blocked from autoplaying - which left the stage showing a
-  // black frame on arrival. Setting it on the node itself, then starting playback,
-  // makes the rendered performance visible without requiring a click.
+  // React does not reliably reflect the `muted` prop onto the DOM element, and
+  // an unmuted element is blocked from autoplaying - which left the stage
+  // showing a black frame on arrival.
   useEffect(() => {
     const el = videoRef.current;
     if (!el) return;
     el.muted = true;
     el.play()
       .then(() => setIsPlaying(true))
-      .catch(() => {
-        // Autoplay refused (some privacy configurations). The poster frame is
-        // still painted and the play control remains available.
-        setIsPlaying(false);
-      });
+      .catch(() => setIsPlaying(false));
   }, [activeMediaSrc]);
 
   const performanceScenes = [
@@ -147,6 +151,7 @@ export const LiveStage: React.FC<LiveStageProps> = ({
   return (
     <div style={{
       flex: 1,
+      minWidth: 0,
       display: 'flex',
       flexDirection: 'column',
       backgroundColor: 'var(--bg-darkest)',
@@ -155,142 +160,157 @@ export const LiveStage: React.FC<LiveStageProps> = ({
     }}>
       {/* Top Bar for Stage */}
       <div style={{
-        padding: '12px 20px',
+        padding: '8px 14px',
         borderBottom: '1px solid var(--border-subtle)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        backgroundColor: 'var(--bg-base)'
+        backgroundColor: 'var(--bg-base)',
+        flexWrap: 'wrap',
+        gap: '8px',
+        minHeight: '44px'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{ fontSize: '12px', fontWeight: 800, letterSpacing: '1px', color: 'var(--text-secondary)' }}>
-            DIGITAL HUMAN PERFORMANCE
+        {/* Left: Stream Metadata & Audio Controls */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', minWidth: 0 }}>
+          {onToggleCast && !showCast && (
+            <button
+              onClick={onToggleCast}
+              className="btn btn-secondary"
+              style={{
+                padding: '2px 8px',
+                fontSize: '11px',
+                borderRadius: 'var(--radius-full)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                border: '1px solid var(--border-subtle)',
+                backgroundColor: 'var(--color-surface)',
+                color: 'var(--text-secondary)'
+              }}
+              title="Open Digital Cast Panel"
+            >
+              <User size={11} color="var(--google-blue)" />
+              <span>Cast ({castCount})</span>
+              <ChevronRight size={10} />
+            </button>
+          )}
+
+          <span style={{ fontSize: '11px', fontWeight: 800, letterSpacing: '0.6px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+            PERFORMANCE
           </span>
+
           {/* Transition Status Badge */}
           <span className={`badge-neon ${
             currentStageStatus === 'APPROVED' ? 'badge-emerald' :
             currentStageStatus === 'SPEAKING' ? 'badge-primary' :
             currentStageStatus === 'PREPARING' ? 'badge-cyan' :
             currentStageStatus === 'VERIFYING' ? 'badge-amber' : 'badge-rose'
-          }`} style={{ fontSize: '10px' }}>
-            STATUS: {currentStageStatus}
+          }`} style={{ fontSize: '9px', padding: '2px 6px', whiteSpace: 'nowrap' }}>
+            {currentStageStatus}
           </span>
-          <span className="badge-neon badge-secondary" style={{ fontSize: '9px' }}>
-            RENDERER: {rendererProvider}
+
+          <span className="badge-neon badge-secondary" style={{ fontSize: '9px', padding: '2px 5px', whiteSpace: 'nowrap' }}>
+            FFmpeg
           </span>
+
+          {/* Language / Audio Track Segmented Toggle */}
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            backgroundColor: 'var(--color-surface)',
+            borderRadius: 'var(--radius-full)',
+            border: '1px solid var(--border-subtle)',
+            padding: '1px',
+            gap: '1px',
+            marginLeft: '2px'
+          }} title="Select Master Audio Track Language">
+            <button
+              onClick={() => { setCurrentLang('en'); setSelectedRepurposedUrl(null); }}
+              style={{
+                padding: '2px 7px',
+                fontSize: '9.5px',
+                fontWeight: 700,
+                borderRadius: 'var(--radius-full)',
+                border: 'none',
+                backgroundColor: currentLang === 'en' ? 'var(--color-primary)' : 'transparent',
+                color: currentLang === 'en' ? '#fff' : 'var(--text-muted)',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+              title="English (Indian)"
+            >
+              EN
+            </button>
+            <button
+              onClick={() => { setCurrentLang('hi'); setSelectedRepurposedUrl(null); }}
+              style={{
+                padding: '2px 7px',
+                fontSize: '9.5px',
+                fontWeight: 700,
+                borderRadius: 'var(--radius-full)',
+                border: 'none',
+                backgroundColor: currentLang === 'hi' ? 'var(--color-secondary)' : 'transparent',
+                color: currentLang === 'hi' ? '#fff' : 'var(--text-muted)',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+              title="Hindi Dub"
+            >
+              HI
+            </button>
+          </div>
         </div>
 
-        {/* View Switcher Tabs */}
+        {/* Right: View Switcher Tabs (Adaptive, fully responsive) */}
         <div style={{
           display: 'flex',
-          backgroundColor: 'var(--bg-surface)',
-          padding: '3px',
-          borderRadius: 'var(--radius-md)',
+          backgroundColor: 'var(--color-surface)',
+          padding: '2px',
+          borderRadius: 'var(--radius-full)',
           border: '1px solid var(--border-subtle)',
-          gap: '4px'
+          gap: '2px',
+          flexWrap: 'wrap'
         }}>
-          <button
-            className="btn"
-            onClick={() => { setActiveTab('video'); setSelectedRepurposedUrl(null); }}
-            style={{
-              padding: '4px 10px',
-              fontSize: '11px',
-              backgroundColor: activeTab === 'video' ? 'var(--primary)' : 'transparent',
-              color: activeTab === 'video' ? 'white' : 'var(--text-muted)'
-            }}
-          >
-            <Film size={12} />
-            Master Video
-          </button>
-          <button
-            className="btn"
-            onClick={() => setActiveTab('performance_preview')}
-            style={{
-              padding: '4px 10px',
-              fontSize: '11px',
-              backgroundColor: activeTab === 'performance_preview' ? 'var(--primary)' : 'transparent',
-              color: activeTab === 'performance_preview' ? 'white' : 'var(--text-muted)'
-            }}
-          >
-            <Activity size={12} />
-            Performance Plan
-          </button>
-          <button
-            className="btn"
-            onClick={() => setActiveTab('storyboard')}
-            style={{
-              padding: '4px 10px',
-              fontSize: '11px',
-              backgroundColor: activeTab === 'storyboard' ? 'var(--primary)' : 'transparent',
-              color: activeTab === 'storyboard' ? 'white' : 'var(--text-muted)'
-            }}
-          >
-            <Layers size={12} />
-            Storyboard (5 Scenes)
-          </button>
-          <button
-            className="btn"
-            onClick={() => setActiveTab('repurposed')}
-            style={{
-              padding: '4px 10px',
-              fontSize: '11px',
-              backgroundColor: activeTab === 'repurposed' ? 'var(--primary)' : 'transparent',
-              color: activeTab === 'repurposed' ? 'white' : 'var(--text-muted)'
-            }}
-          >
-            <Sparkles size={12} />
-            9:16 Shorts ({repurposedClips.length || 3})
-          </button>
-          <button
-            className="btn"
-            onClick={() => setActiveTab('c2pa')}
-            style={{
-              padding: '4px 10px',
-              fontSize: '11px',
-              backgroundColor: activeTab === 'c2pa' ? 'var(--primary)' : 'transparent',
-              color: activeTab === 'c2pa' ? 'white' : 'var(--text-muted)'
-            }}
-          >
-            <Shield size={12} />
-            C2PA Provenance
-          </button>
-        </div>
-
-        {/* Language Toggle */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Audio Track:</span>
-          <button
-            onClick={() => { setCurrentLang('en'); setSelectedRepurposedUrl(null); }}
-            style={{
-              padding: '3px 8px',
-              fontSize: '10px',
-              fontWeight: 700,
-              borderRadius: 'var(--radius-sm)',
-              border: '1px solid',
-              borderColor: currentLang === 'en' ? 'var(--primary)' : 'var(--border-subtle)',
-              backgroundColor: currentLang === 'en' ? 'rgba(99,102,241,0.2)' : 'transparent',
-              color: currentLang === 'en' ? 'var(--primary-light)' : 'var(--text-muted)',
-              cursor: 'pointer'
-            }}
-          >
-            EN (Indian)
-          </button>
-          <button
-            onClick={() => { setCurrentLang('hi'); setSelectedRepurposedUrl(null); }}
-            style={{
-              padding: '3px 8px',
-              fontSize: '10px',
-              fontWeight: 700,
-              borderRadius: 'var(--radius-sm)',
-              border: '1px solid',
-              borderColor: currentLang === 'hi' ? 'var(--accent-emerald)' : 'var(--border-subtle)',
-              backgroundColor: currentLang === 'hi' ? 'rgba(16,185,129,0.2)' : 'transparent',
-              color: currentLang === 'hi' ? 'var(--accent-emerald)' : 'var(--text-muted)',
-              cursor: 'pointer'
-            }}
-          >
-            HI (Hindi Re-perf)
-          </button>
+          {[
+            { id: 'video', label: 'Video', icon: Film, title: 'Master Video' },
+            { id: '3d_neural_core', label: '3D Core', icon: Cpu, title: '3D Biometric Neural Core' },
+            { id: 'performance_preview', label: 'Plan', icon: Activity, title: 'Performance Plan' },
+            { id: 'storyboard', label: 'Storyboard', icon: Layers, title: 'Multi-Scene Storyboard' },
+            { id: 'repurposed', label: `Shorts (${repurposedClips.length || 3})`, icon: Sparkles, title: 'Omnichannel Vertical Shorts' },
+            { id: 'c2pa', label: 'C2PA', icon: Shield, title: 'C2PA Cryptographic Provenance Manifest' }
+          ].map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                className="btn"
+                onClick={() => {
+                  setActiveTab(tab.id as any);
+                  if (tab.id === 'video') setSelectedRepurposedUrl(null);
+                }}
+                style={{
+                  padding: '3px 8px',
+                  fontSize: '11px',
+                  fontWeight: isActive ? 700 : 500,
+                  borderRadius: 'var(--radius-full)',
+                  backgroundColor: isActive ? 'var(--color-primary)' : 'transparent',
+                  color: isActive ? 'var(--color-on-primary)' : 'var(--text-secondary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  whiteSpace: 'nowrap'
+                }}
+                title={tab.title}
+              >
+                <Icon size={12} />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -301,39 +321,110 @@ export const LiveStage: React.FC<LiveStageProps> = ({
         alignItems: 'center',
         justifyContent: 'center',
         padding: '24px',
-        position: 'relative'
+        position: 'relative',
+        overflow: 'hidden'
       }}>
-        {activeTab === 'video' && (
-          <div style={{
-            position: 'relative',
-            width: selectedRepurposedUrl ? '360px' : '100%',
-            maxWidth: selectedRepurposedUrl ? '360px' : '880px',
-            aspectRatio: selectedRepurposedUrl ? '9/16' : '16/9',
-            borderRadius: 'var(--radius-lg)',
-            overflow: 'hidden',
-            boxShadow: '0 20px 50px rgba(0,0,0,0.8), 0 0 30px rgba(99,102,241,0.15)',
-            border: '1px solid var(--border-focus)',
-            backgroundColor: '#000'
-          }}>
-            {/* Real HTML5 Video Element */}
-            <video
-              ref={videoRef}
-              src={activeMediaSrc}
-              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-              onPlay={() => setIsPlaying(true)}
-              onPause={() => setIsPlaying(false)}
-              onEnded={() => setIsPlaying(false)}
-              playsInline
-              loop
-              // Autoplay muted so the stage shows the rendered performance on
-              // arrival. Without preload the element paints an empty black frame
-              // until someone presses play, which reads as a broken render.
-              muted
-              autoPlay
-              preload="metadata"
-            />
+        <AnimatePresence mode="wait">
+          {activeTab === '3d_neural_core' && (
+            <motion.div
+              key="3d_neural_core"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.25 }}
+              style={{ width: '100%', maxWidth: '880px', height: '100%', maxHeight: '520px' }}
+            >
+              <GoogleLabs3D
+                characterName={characterName}
+                characterVersion={characterVersion}
+                isSpeaking={isPlaying || stageStatus === 'SPEAKING'}
+                energy={energy}
+                height="100%"
+              />
+            </motion.div>
+          )}
 
-            {/* Neural HUD Overlay (Section 14, Milestone 8) */}
+          {activeTab === 'video' && (
+            <motion.div
+              key="video"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.25 }}
+              style={{
+                position: 'relative',
+                width: selectedRepurposedUrl ? '360px' : '100%',
+                maxWidth: selectedRepurposedUrl ? '360px' : '880px',
+                aspectRatio: selectedRepurposedUrl ? '9/16' : '16/9',
+                borderRadius: 'var(--radius-lg)',
+                overflow: 'hidden',
+                boxShadow: '0 20px 50px rgba(0,0,0,0.8), 0 0 30px rgba(66,133,244,0.15)',
+                border: '1px solid var(--border-focus)',
+                backgroundColor: '#000'
+              }}
+            >
+              {/* Real HTML5 Video Element */}
+              <video
+                ref={videoRef}
+                src={activeMediaSrc}
+                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                onPlay={() => setIsPlaying(true)}
+                onPause={() => setIsPlaying(false)}
+                onEnded={() => setIsPlaying(false)}
+                playsInline
+                loop
+                // Autoplay muted so the stage shows the rendered performance on
+                // arrival. Without this the element paints an empty black frame
+                // until someone presses play, which reads as a broken render.
+                muted
+                autoPlay
+                preload="metadata"
+              />
+
+              {/* PiP 3D Hologram Toggle */}
+              {showPip3D && (
+                <div style={{
+                  position: 'absolute',
+                  top: '16px',
+                  right: '16px',
+                  width: '180px',
+                  height: '130px',
+                  borderRadius: '12px',
+                  overflow: 'hidden',
+                  border: '1px solid rgba(138, 180, 248, 0.4)',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+                  zIndex: 10
+                }}>
+                  <GoogleLabs3D
+                    characterName={characterName}
+                    characterVersion={characterVersion}
+                    isSpeaking={isPlaying}
+                    energy={energy}
+                    height="100%"
+                  />
+                  <button
+                    onClick={() => setShowPip3D(false)}
+                    style={{
+                      position: 'absolute',
+                      top: '4px',
+                      right: '4px',
+                      background: 'rgba(0,0,0,0.6)',
+                      border: 'none',
+                      color: 'white',
+                      borderRadius: '50%',
+                      width: '18px',
+                      height: '18px',
+                      fontSize: '10px',
+                      cursor: 'pointer',
+                      zIndex: 20
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
+
+              {/* Neural HUD Overlay (Section 14, Milestone 8) */}
             <div style={{
               position: 'absolute',
               top: '16px',
@@ -463,7 +554,7 @@ export const LiveStage: React.FC<LiveStageProps> = ({
                 <div className="wave-bar" style={{ animationDelay: '0.3s' }} />
               </div>
             </div>
-          </div>
+          </motion.div>
         )}
 
         {/* Milestone 8: Storyboard -> Performance Preview Tab */}
@@ -581,7 +672,9 @@ export const LiveStage: React.FC<LiveStageProps> = ({
             <div style={{ marginBottom: '16px' }}>
               <h3 style={{ fontSize: '16px', fontWeight: 700 }}>Agentic Repurposing — Platform-Native Derivative Clips</h3>
               <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                Semantic moment scoring extracted 3 high-impact clips with verified claim isolation.
+                {repurposedClips.length > 0
+                  ? `Semantic moment scoring extracted ${repurposedClips.length} clips with verified claim isolation.`
+                  : 'Derivative clips are generated from an approved master.'}
               </p>
             </div>
 
@@ -681,6 +774,7 @@ export const LiveStage: React.FC<LiveStageProps> = ({
             </div>
           </div>
         )}
+        </AnimatePresence>
       </div>
     </div>
   );

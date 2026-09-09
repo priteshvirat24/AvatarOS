@@ -1,4 +1,5 @@
 import React from 'react';
+import { ChevronDown } from 'lucide-react';
 
 interface ProductionTimelineProps {
   shots: any[];
@@ -6,6 +7,7 @@ interface ProductionTimelineProps {
   onSelectScene: (sceneNo: number) => void;
   failedScenes?: number[];
   isBlocked?: boolean;
+  onClose?: () => void;
 }
 
 export const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
@@ -13,7 +15,8 @@ export const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
   activeSceneNo,
   onSelectScene,
   failedScenes = [],
-  isBlocked = false
+  isBlocked = false,
+  onClose
 }) => {
   const defaultScenes = [
     { scene_no: 1, role: "Hook", duration_s: 6.8, target_emotion: "curious", emotional_intensity: 0.55, shot: "close_up" },
@@ -47,7 +50,7 @@ export const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
           </span>
         </div>
 
-        {/* Emotion curve key */}
+        {/* Emotion curve key & hide button */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '11px', color: 'var(--text-muted)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
             <span style={{ width: '8px', height: '8px', borderRadius: '2px', backgroundColor: 'var(--accent-emerald)' }} />
@@ -61,6 +64,29 @@ export const ProductionTimeline: React.FC<ProductionTimelineProps> = ({
             <span style={{ width: '8px', height: '8px', borderRadius: '2px', backgroundColor: 'var(--accent-rose)' }} />
             <span>Blocked / Rework</span>
           </div>
+          {onClose && (
+            <button
+              onClick={onClose}
+              style={{
+                background: 'var(--color-surface-elevated)',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: 'var(--radius-full)',
+                cursor: 'pointer',
+                color: 'var(--text-secondary)',
+                padding: '3px 10px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                fontSize: '11px',
+                fontWeight: 600,
+                marginLeft: '8px'
+              }}
+              title="Hide Timeline"
+            >
+              <ChevronDown size={14} />
+              <span>Hide</span>
+            </button>
+          )}
         </div>
       </div>
 
