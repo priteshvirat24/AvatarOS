@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, Sparkles, Sliders, Dna, FileCheck, CheckCircle2, AlertCircle } from 'lucide-react';
+import { ShieldCheck, Sparkles, Sliders, Dna, FileCheck, CheckCircle2, AlertCircle, X } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface CastMember {
@@ -20,6 +20,7 @@ interface DigitalCastProps {
   onSelect: (id: string) => void;
   onOpenCompiler: () => void;
   onOpenDnaModal: (characterId: string) => void;
+  onClose?: () => void;
 }
 
 export const DigitalCast: React.FC<DigitalCastProps> = ({
@@ -28,6 +29,7 @@ export const DigitalCast: React.FC<DigitalCastProps> = ({
   onSelect,
   onOpenCompiler,
   onOpenDnaModal,
+  onClose
 }) => {
   return (
     <aside style={{
@@ -60,15 +62,35 @@ export const DigitalCast: React.FC<DigitalCastProps> = ({
             Persistent Identities &amp; DNA
           </p>
         </div>
-        <button
-          className="btn btn-secondary"
-          style={{ padding: '6px 12px', fontSize: '11px' }}
-          onClick={onOpenCompiler}
-          title="Compile New Character"
-        >
-          <Sparkles size={13} color="var(--color-primary)" />
-          Compile
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <button
+            className="btn btn-secondary"
+            style={{ padding: '6px 12px', fontSize: '11px', borderRadius: 'var(--radius-full)' }}
+            onClick={onOpenCompiler}
+          >
+            <Sparkles size={12} color="var(--color-primary)" />
+            Compile
+          </button>
+          {onClose && (
+            <button
+              onClick={onClose}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                color: 'var(--text-muted)',
+                padding: '4px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              title="Close Cast Panel"
+            >
+              <X size={16} />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Cast List */}

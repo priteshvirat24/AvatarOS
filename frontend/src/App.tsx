@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import {
   Home, Film, Sparkles, MessageSquare, Database, Terminal, Shield, RefreshCw,
-  Play, CheckCircle2, AlertTriangle, Layers, Dna, UploadCloud, BookOpen, Globe, Cloud, Search, Award
+  Play, CheckCircle2, AlertTriangle, Layers, Dna, UploadCloud, BookOpen, Globe, Cloud, Search, Award,
+  Users, ChevronRight, ChevronUp, ChevronDown, X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -39,6 +40,10 @@ export const App: React.FC = () => {
   const [commandInput, setCommandInput] = useState<string>(
     "Create a 60-second product launch for Indian developers. Research our documentation first. Do not make unsupported claims. Produce English and Hindi versions."
   );
+
+  // Collapsible drawers (collapsed by default for ultra-clean look)
+  const [showCast, setShowCast] = useState(false);
+  const [showTimeline, setShowTimeline] = useState(false);
 
   const navigateTo = (page: 'home' | 'studio' | 'live' | 'evolution' | 'knowledge') => {
     setViewMode(page);
@@ -512,18 +517,71 @@ export const App: React.FC = () => {
             </div>
           </div>
 
-          {/* CREATE PRODUCTION Action Button */}
-          <button
-            className="btn btn-primary"
-            onClick={() => runProduction({})}
-            disabled={isExecuting}
-            style={{ padding: '8px 22px', fontSize: '13px', fontWeight: 600, flexShrink: 0 }}
-          >
-            {isExecuting ? <RefreshCw size={14} className="animate-spin" /> : <Sparkles size={14} />}
-            CREATE PRODUCTION
-          </button>
-        </div>
-      )}
+            {/* Studio Panel Toggles (Digital Cast & Production Timeline) */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+              <button
+                onClick={() => setShowCast(!showCast)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '7px 14px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  borderRadius: 'var(--radius-full)',
+                  border: showCast ? '1px solid var(--google-blue)' : '1px solid var(--border-subtle)',
+                  backgroundColor: showCast ? 'rgba(26, 115, 232, 0.08)' : 'var(--color-surface)',
+                  color: showCast ? 'var(--google-blue)' : 'var(--text-secondary)',
+                  transition: 'all 0.2s ease',
+                  cursor: 'pointer'
+                }}
+                title="Toggle Digital Cast (Actors & DNA)"
+              >
+                <Users size={14} color={showCast ? 'var(--google-blue)' : 'var(--text-secondary)'} />
+                <span>Cast</span>
+                <span className="badge-neon badge-primary" style={{ padding: '1px 6px', fontSize: '10px' }}>
+                  {cast.length || 4}
+                </span>
+              </button>
+
+              <button
+                onClick={() => setShowTimeline(!showTimeline)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '7px 14px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  borderRadius: 'var(--radius-full)',
+                  border: showTimeline ? '1px solid var(--google-blue)' : '1px solid var(--border-subtle)',
+                  backgroundColor: showTimeline ? 'rgba(26, 115, 232, 0.08)' : 'var(--color-surface)',
+                  color: showTimeline ? 'var(--google-blue)' : 'var(--text-secondary)',
+                  transition: 'all 0.2s ease',
+                  cursor: 'pointer'
+                }}
+                title="Toggle Production Timeline"
+              >
+                <Film size={14} color={showTimeline ? 'var(--google-blue)' : 'var(--text-secondary)'} />
+                <span>Timeline</span>
+                <span className="badge-neon badge-primary" style={{ padding: '1px 6px', fontSize: '10px' }}>
+                  {campaignData?.director_plan?.shots?.length || 5}s
+                </span>
+              </button>
+            </div>
+
+            {/* CREATE PRODUCTION Action Button */}
+            <button
+              className="btn btn-primary"
+              onClick={() => runProduction({})}
+              disabled={isExecuting}
+              style={{ padding: '8px 22px', fontSize: '13px', fontWeight: 600, flexShrink: 0 }}
+            >
+              {isExecuting ? <RefreshCw size={14} className="animate-spin" /> : <Sparkles size={14} />}
+              CREATE PRODUCTION
+            </button>
+          </div>
+        )}
 
       {/* Main Workspace Body with Framer Motion transitions */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
@@ -567,15 +625,70 @@ export const App: React.FC = () => {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -6 }}
               transition={{ duration: 0.2 }}
-              style={{ flex: 1, display: 'flex', overflow: 'hidden' }}
+              style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}
             >
-              <DigitalCast
-                cast={cast}
-                selectedId={selectedCharacterId}
-                onSelect={setSelectedCharacterId}
-                onOpenCompiler={() => setShowCompilerModal(true)}
-                onOpenDnaModal={(id) => setDnaModalCharId(id)}
-              />
+              {/* Digital Cast Sliding Drawer */}
+              <AnimatePresence initial={false}>
+                {showCast && (
+                  <motion.div
+                    key="cast-drawer"
+                    initial={{ width: 0, opacity: 0 }}
+                    animate={{ width: 280, opacity: 1 }}
+                    exit={{ width: 0, opacity: 0 }}
+                    transition={{ duration: 0.25, ease: [0.2, 0, 0, 1] }}
+                    style={{ overflow: 'hidden', height: '100%', flexShrink: 0, zIndex: 15 }}
+                  >
+                    <DigitalCast
+                      cast={cast}
+                      selectedId={selectedCharacterId}
+                      onSelect={setSelectedCharacterId}
+                      onOpenCompiler={() => setShowCompilerModal(true)}
+                      onOpenDnaModal={(id) => setDnaModalCharId(id)}
+                      onClose={() => setShowCast(false)}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Floating Edge Toggle when Cast is collapsed */}
+              {!showCast && (
+                <button
+                  onClick={() => setShowCast(true)}
+                  style={{
+                    position: 'absolute',
+                    top: '16px',
+                    left: '16px',
+                    zIndex: 25,
+                    backgroundColor: 'var(--color-surface-elevated)',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: 'var(--radius-full)',
+                    padding: '6px 14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    color: 'var(--text-secondary)',
+                    boxShadow: '0 2px 10px rgba(0,0,0,0.08)',
+                    cursor: 'pointer',
+                    backdropFilter: 'blur(8px)',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = 'var(--google-blue)';
+                    e.currentTarget.style.color = 'var(--google-blue)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = 'var(--border-subtle)';
+                    e.currentTarget.style.color = 'var(--text-secondary)';
+                  }}
+                  title="Open Digital Cast Panel"
+                >
+                  <Users size={14} color="var(--google-blue)" />
+                  <span>Cast ({cast.length || 4})</span>
+                  <ChevronRight size={13} />
+                </button>
+              )}
 
               <LiveStage
                 videoUrl={campaignData?.master_video_url || "/media/master_video_en.mp4"}
@@ -599,6 +712,52 @@ export const App: React.FC = () => {
                 onReworkScene={handleReworkScene}
                 isExecuting={isExecuting}
               />
+
+              {/* Floating Bottom Timeline Toggle when collapsed */}
+              {!showTimeline && (
+                <div style={{
+                  position: 'absolute',
+                  bottom: '16px',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  zIndex: 25
+                }}>
+                  <button
+                    onClick={() => setShowTimeline(true)}
+                    style={{
+                      backgroundColor: 'var(--color-surface-elevated)',
+                      border: '1px solid var(--border-subtle)',
+                      borderRadius: 'var(--radius-full)',
+                      padding: '7px 18px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: 'var(--text-secondary)',
+                      boxShadow: '0 4px 14px rgba(0,0,0,0.1)',
+                      cursor: 'pointer',
+                      backdropFilter: 'blur(8px)',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = 'var(--google-blue)';
+                      e.currentTarget.style.color = 'var(--google-blue)';
+                      e.currentTarget.style.boxShadow = '0 4px 16px rgba(26, 115, 232, 0.2)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = 'var(--border-subtle)';
+                      e.currentTarget.style.color = 'var(--text-secondary)';
+                      e.currentTarget.style.boxShadow = '0 4px 14px rgba(0,0,0,0.1)';
+                    }}
+                    title="Open Production Timeline"
+                  >
+                    <Film size={14} color="var(--google-blue)" />
+                    <span>Timeline ({campaignData?.director_plan?.shots?.length || 5} Scenes)</span>
+                    <ChevronUp size={13} />
+                  </button>
+                </div>
+              )}
             </motion.div>
           )}
 
@@ -643,15 +802,29 @@ export const App: React.FC = () => {
         </AnimatePresence>
       </div>
 
-      {/* Bottom Production Timeline (Only in Studio Mode) */}
+      {/* Bottom Production Timeline (Only in Studio Mode, toggled on request) */}
       {viewMode === 'studio' && (
-        <ProductionTimeline
-          shots={campaignData?.director_plan?.shots || []}
-          activeSceneNo={activeSceneNo}
-          onSelectScene={setActiveSceneNo}
-          failedScenes={campaignData?.guardian_report?.failed_scenes}
-          isBlocked={campaignData?.publish_result?.status === 'BLOCKED'}
-        />
+        <AnimatePresence>
+          {showTimeline && (
+            <motion.div
+              key="studio-timeline-footer"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.25, ease: [0.2, 0, 0, 1] }}
+              style={{ overflow: 'hidden', flexShrink: 0 }}
+            >
+              <ProductionTimeline
+                shots={campaignData?.director_plan?.shots || []}
+                activeSceneNo={activeSceneNo}
+                onSelectScene={setActiveSceneNo}
+                failedScenes={campaignData?.guardian_report?.failed_scenes}
+                isBlocked={campaignData?.publish_result?.status === 'BLOCKED'}
+                onClose={() => setShowTimeline(false)}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
       )}
 
       {/* Floating 9-Step Demo Walkthrough Guide */}
@@ -659,10 +832,16 @@ export const App: React.FC = () => {
         currentStep={demoStep}
         onSelectStep={(step) => {
           setDemoStep(step);
-          if (step === 1) setDnaModalCharId('maya');
+          if (step === 1) {
+            setShowCast(true);
+            setDnaModalCharId('maya');
+          }
           if (step === 2) navigateTo('studio');
           if (step === 3) navigateTo('studio');
-          if (step === 6) navigateTo('studio');
+          if (step === 6) {
+            setShowTimeline(true);
+            navigateTo('studio');
+          }
           if (step === 7) navigateTo('live');
           if (step === 8 || step === 9) navigateTo('evolution');
         }}
