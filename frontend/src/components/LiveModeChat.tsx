@@ -375,11 +375,16 @@ export const LiveModeChat: React.FC<LiveModeChatProps> = ({ onHandoffToStudio })
       });
 
       // Append Assistant Transcript
+      const assistantReply = data.reply || data.reply_text || data.transcript?.text || "I understand. Let's continue discussing the Titan platform.";
+      const isDeflected = assistantReply.toLowerCase().includes("cannot provide") ||
+                          assistantReply.toLowerCase().includes("restricted") ||
+                          Boolean(data.is_deflection);
+
       setTranscripts((prev) => [
         ...prev,
         {
           speaker: 'assistant',
-          text: data.reply_text,
+          text: assistantReply,
           latency_ms: bk.total_latency_ms,
           latency_breakdown: {
             asr_ms: bk.asr_latency_ms,
@@ -388,7 +393,7 @@ export const LiveModeChat: React.FC<LiveModeChatProps> = ({ onHandoffToStudio })
             total_latency_ms: bk.total_latency_ms
           },
           register: activeStrategy.register,
-          is_deflection: data.reply_text.includes("I cannot provide") || data.reply_text.includes("restricted"),
+          is_deflection: isDeflected,
           timestamp: new Date().toLocaleTimeString()
         }
       ]);
