@@ -80,7 +80,10 @@ class Settings(BaseSettings):
     VOICE_CONCURRENCY: int = 4
     # Scene renders are independent ffmpeg processes writing to distinct files.
     # Bounded by CPU rather than by API limits.
-    RENDER_CONCURRENCY: int = 4
+    # Deliberately below VOICE_CONCURRENCY: each render is a full ffmpeg process,
+    # and oversubscribing CPU starved the web server enough to drop websocket
+    # connections and in-flight requests during a production run.
+    RENDER_CONCURRENCY: int = 2
     LIVE_MODE_ENABLED: bool = True
 
     # Knowledge Base & Hybrid Retrieval (Milestone 3)

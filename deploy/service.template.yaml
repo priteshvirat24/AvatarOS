@@ -71,6 +71,13 @@ spec:
               value: "deterministic"
             - name: ASR_PROVIDER
               value: "deterministic"
+            # Sized for the 2 vCPU limit below. Speech synthesis is network-bound
+            # so it can overlap freely; renders are ffmpeg processes and must not
+            # starve the request loop.
+            - name: VOICE_CONCURRENCY
+              value: "3"
+            - name: RENDER_CONCURRENCY
+              value: "2"
             - name: GEMINI_API_KEY
               valueFrom:
                 secretKeyRef:

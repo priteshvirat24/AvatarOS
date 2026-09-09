@@ -627,13 +627,22 @@ export const App: React.FC = () => {
 
       {/* Main Workspace Body with Framer Motion transitions */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
-        <AnimatePresence mode="wait">
+        {/*
+          The top-level view switch deliberately does not use AnimatePresence.
+
+          Under framer-motion 13 with React 19 the exit animation never
+          completed here. With mode="wait" that left every destination
+          unreachable - the hash and nav highlight changed but no view mounted.
+          Without it, the outgoing view was never removed and two views stacked
+          on top of each other. Each view keeps its enter animation; only the
+          exit choreography is dropped, which is invisible in use and leaves
+          navigation deterministic.
+        */}
           {viewMode === 'home' && (
             <motion.div
               key="home"
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
               transition={{ duration: 0.2 }}
               style={{ flex: 1, display: 'flex', overflow: 'hidden' }}
             >
@@ -665,7 +674,6 @@ export const App: React.FC = () => {
               key="studio"
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
               transition={{ duration: 0.2 }}
               style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}
             >
@@ -725,7 +733,6 @@ export const App: React.FC = () => {
               key="live"
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
               transition={{ duration: 0.2 }}
               style={{ flex: 1, display: 'flex', overflow: 'hidden' }}
             >
@@ -738,7 +745,6 @@ export const App: React.FC = () => {
               key="evolution"
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
               transition={{ duration: 0.2 }}
               style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: '14px', gap: '12px' }}
             >
@@ -785,14 +791,13 @@ export const App: React.FC = () => {
               key="knowledge"
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
               transition={{ duration: 0.2 }}
               style={{ flex: 1, display: 'flex', overflow: 'hidden' }}
             >
               <KnowledgeRetrieval />
             </motion.div>
           )}
-        </AnimatePresence>
+
       </div>
 
       {/* Bottom Production Timeline Dock Bar (Only in Studio Mode) */}
