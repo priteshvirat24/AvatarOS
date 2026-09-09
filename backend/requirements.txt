@@ -31,5 +31,16 @@ pypdf>=5.0.0,<6.0.0
 # Google GenAI & Agentic Reasoning (Milestone 4)
 google-genai>=0.8.0,<1.0.0
 
-# Mistral AI Conversational & Fallback Provider (Milestone 6)
-mistralai>=2.0.0
+# Google Cloud Storage for the media vault (Milestone 10).
+# Required whenever MEDIA_STORAGE_PROVIDER=gcs. Cloud Run's filesystem is
+# ephemeral, so a deployment that must keep rendered media across cold starts
+# needs this rather than the local fallback.
+google-cloud-storage>=2.14.0,<4.0.0
+
+# MCP Protocol Client (Milestone 7)
+# AVATAROS speaks the real MCP wire protocol to the OFFICIAL ClickHouse MCP server
+# (`mcp-clickhouse`). That server is deliberately installed into its own virtualenv
+# (see backend/requirements-mcp-server.txt) because it depends on fastmcp/starlette
+# versions that conflict with this application's FastAPI pin. Isolating it keeps
+# both dependency trees valid and keeps the partner server a real, separate process.
+mcp>=1.9.0,<2.0.0

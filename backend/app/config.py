@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     MEDIA_STORAGE_PROVIDER: Literal["local", "gcs"] = "local"
     GOOGLE_CLOUD_STORAGE_BUCKET: Optional[str] = None
     VAULT_STORAGE_PATH: str = "backend/static/media"
+    # When true the API also serves the built SPA from FRONTEND_DIST_PATH, so a
+    # deployment is a single origin and needs no CORS configuration.
+    SERVE_FRONTEND: bool = False
+    FRONTEND_DIST_PATH: str = "frontend/dist"
 
     # ClickHouse Analytics Configuration
     TELEMETRY_PROVIDER: Literal["clickhouse", "in_memory"] = "clickhouse"
@@ -50,11 +54,33 @@ class Settings(BaseSettings):
 
     # Media & Avatar Rendering Engine (Milestone 8)
     FFMPEG_PATH: Optional[str] = None
+    # Wall-clock budget for a single ffmpeg/ffprobe invocation. Generous on
+    # purpose: exceeding it degrades the render rather than failing loudly, so a
+    # tight bound turns a busy machine into a silently worse result.
+    MEDIA_SUBPROCESS_TIMEOUT: float = 90.0
     RENDERER_PROVIDER: Literal["deterministic", "ffmpeg", "neural_liveportrait", "external_api"] = "ffmpeg"
     RENDERER_API_KEY: Optional[SecretStr] = None
     VOICE_PROVIDER: Literal["deterministic", "gemini_tts", "google_tts"] = "deterministic"
     VOICE_MODEL: str = "maya-english-v4"
     VOICE_MODEL_HI: str = "maya-hindi-v1"
+    # Gemini native TTS. The TTS models are versioned separately from the text
+    # models and are still served under the 2.5 preview names.
+    GEMINI_TTS_MODEL: str = "gemini-2.5-flash-preview-tts"
+    # Prebuilt Gemini voice used per language. Part of the character's identity,
+    # so changing it changes who the actor sounds like - it belongs in Digital DNA
+    # terms, not in an arbitrary per-request parameter.
+    GEMINI_VOICE_EN: str = "Aoede"
+    GEMINI_VOICE_HI: str = "Aoede"
+    # Synthesized speech is cached by (text, voice, language, delivery) so a
+    # repeated production run does not re-bill or re-wait for identical lines.
+    VOICE_CACHE_ENABLED: bool = True
+    # Scenes are synthesized concurrently. Speech synthesis is network-bound and
+    # independent per scene, so doing it serially made a production run wait on
+    # the sum of every round trip. Bounded to stay well inside API rate limits.
+    VOICE_CONCURRENCY: int = 4
+    # Scene renders are independent ffmpeg processes writing to distinct files.
+    # Bounded by CPU rather than by API limits.
+    RENDER_CONCURRENCY: int = 4
     LIVE_MODE_ENABLED: bool = True
 
     # Knowledge Base & Hybrid Retrieval (Milestone 3)
@@ -68,14 +94,23 @@ class Settings(BaseSettings):
     KNOWLEDGE_BASE_PATH: str = "backend/knowledge"
     CLAIM_CONFIDENCE_THRESHOLD: float = 0.60
 
-    # Gemini & Google ADK Agentic Reasoning (Milestone 4)
+    # Gemini agentic reasoning (Milestone 4)
     AI_PROVIDER: Literal["gemini", "deterministic"] = "deterministic"
-    GEMINI_MODEL: str = "gemini-2.5-flash"
-    GEMINI_REASONING_MODEL: str = "gemini-2.5-pro"
+    # Model IDs are verified against the live API on first use. The 2.x family is
+    # no longer served to new API keys, so the defaults target the current
+    # generation; GEMINI_MODEL_FALLBACKS are tried in order if the pinned model
+    # returns 404, which keeps a deployment alive if a model is retired mid-judging.
+    GEMINI_MODEL: str = "gemini-3.6-flash"
+    GEMINI_REASONING_MODEL: str = "gemini-pro-latest"
+    GEMINI_MODEL_FALLBACKS: List[str] = Field(
+        default_factory=lambda: ["gemini-flash-latest", "gemini-flash-lite-latest"]
+    )
     GEMINI_TEMPERATURE: float = 0.2
     GEMINI_MAX_OUTPUT_TOKENS: int = 4096
     GOOGLE_GENAI_USE_VERTEXAI: bool = False
-    ADK_ENABLED: bool = True
+    # Enables the in-process structured agent runtime (backend/app/ai/agent_runtime.py).
+    # Named for what it is: this project does not use Google's Agent Development Kit.
+    AGENT_RUNTIME_ENABLED: bool = True
 
     # Multimodal Guardian & ASR Verification (Milestone 5)
     FFPROBE_PATH: Optional[str] = None
@@ -92,8 +127,8 @@ class Settings(BaseSettings):
     GUARDIAN_MAX_FILE_SIZE_BYTES: int = 500 * 1024 * 1024  # 500 MB
 
     # Gemini Live API & Real-Time Live Digital Human (Milestone 6)
-    LIVE_PROVIDER: Literal["gemini_live", "mistral", "deterministic"] = "deterministic"
-    LIVE_MODEL: str = "gemini-2.5-flash"
+    LIVE_PROVIDER: Literal["gemini_live", "gemini_turn_based", "deterministic"] = "deterministic"
+    LIVE_MODEL: str = "gemini-3.6-flash"
     LIVE_LANGUAGE: str = "en"
     LIVE_VOICE: str = "Aoede"
     LIVE_AUDIO_SAMPLE_RATE: int = 16000
@@ -102,19 +137,21 @@ class Settings(BaseSettings):
     LIVE_ENABLE_AUDIO_INPUT: bool = True
     LIVE_ENABLE_AUDIO_OUTPUT: bool = True
 
-    # Mistral AI Conversational & Fallback Provider (Milestone 6)
-    MISTRAL_API_KEY: Optional[SecretStr] = None
-    MISTRAL_MODEL: str = "mistral-small-latest"
-    MISTRAL_BASE_URL: Optional[str] = "https://api.mistral.ai/v1"
-    MISTRAL_TIMEOUT: float = 15.0
-    MISTRAL_MAX_RETRIES: int = 2
-
     # MCP + ClickHouse Partner Integration & Agent Tool Governance (Milestone 7)
     MCP_ENABLED: bool = True
     MCP_PROVIDER: Literal["clickhouse_mcp", "deterministic"] = "deterministic"
-    MCP_SERVER_URL: Optional[str] = "http://localhost:8123"
-    MCP_TRANSPORT: Literal["stdio", "sse", "http", "in_process"] = "in_process"
-    MCP_TIMEOUT: float = 5.0
+    # Transport used to reach the official `mcp-clickhouse` server. `stdio` runs it
+    # as a managed subprocess; `http`/`sse` attach to an already-running instance.
+    MCP_TRANSPORT: Literal["stdio", "sse", "http"] = "stdio"
+    # Only used for http/sse transport.
+    MCP_SERVER_URL: Optional[str] = None
+    # Console script for the official server. Empty means "discover next to the
+    # running interpreter, then fall back to PATH".
+    MCP_SERVER_COMMAND: Optional[str] = None
+    # Tool the official server exposes for SQL execution. Named explicitly so a
+    # server-side rename is a config change rather than a code change.
+    MCP_QUERY_TOOL: str = "run_query"
+    MCP_TIMEOUT: float = 20.0
     MCP_MAX_TOOL_CALLS: int = 10
     MCP_ALLOWED_TOOLS: List[str] = Field(default_factory=lambda: [
         "query_scene_performance",
@@ -124,6 +161,24 @@ class Settings(BaseSettings):
         "get_claim_verification_metrics"
     ])
     MCP_ENVIRONMENT: str = "development"
+
+    @field_validator(
+        "GEMINI_API_KEY", "CLICKHOUSE_PASSWORD", "RENDERER_API_KEY",
+        mode="before"
+    )
+    @classmethod
+    def empty_secret_is_absent(cls, value):
+        """
+        Treats an empty or whitespace-only secret as absent.
+
+        Without this, `GEMINI_API_KEY=` in a .env file produces `SecretStr('')`,
+        which is a truthy object - so every `bool(settings.GEMINI_API_KEY)` check
+        in the provider matrix would report a live Gemini connection backed by no
+        credential. An unset key must read as unset everywhere.
+        """
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
@@ -234,24 +289,25 @@ class Settings(BaseSettings):
             },
             "live": {
                 "real_provider": "gemini_live_api",
-                "conversational_fallback": "mistral_turn_based",
+                "conversational_fallback": "gemini_turn_based",
                 "deterministic_fallback": "deterministic_live_cascade",
-                "active": "gemini_live_api" if (self.LIVE_PROVIDER == "gemini_live" and self.GEMINI_API_KEY) else ("mistral_turn_based" if (self.LIVE_PROVIDER == "mistral" and self.MISTRAL_API_KEY) else "deterministic_live_cascade"),
-                "is_real": bool(self.LIVE_PROVIDER == "gemini_live" and self.GEMINI_API_KEY),
-                "is_degraded": bool(self.LIVE_PROVIDER == "mistral" and self.MISTRAL_API_KEY),
-                "provider_mode": "realtime" if (self.LIVE_PROVIDER == "gemini_live" and self.GEMINI_API_KEY) else ("turn_based_fallback" if (self.LIVE_PROVIDER == "mistral" and self.MISTRAL_API_KEY) else "offline_fallback"),
-                "model": self.LIVE_MODEL if self.LIVE_PROVIDER == "gemini_live" else (self.MISTRAL_MODEL if self.LIVE_PROVIDER == "mistral" else "deterministic_script"),
+                "active": "gemini_live_api" if (self.LIVE_PROVIDER == "gemini_live" and self.GEMINI_API_KEY) else ("gemini_turn_based" if (self.LIVE_PROVIDER == "gemini_turn_based" and self.GEMINI_API_KEY) else "deterministic_live_cascade"),
+                "is_real": bool(self.LIVE_PROVIDER in ("gemini_live", "gemini_turn_based") and self.GEMINI_API_KEY),
+                "is_degraded": bool(self.LIVE_PROVIDER == "gemini_turn_based" and self.GEMINI_API_KEY),
+                "provider_mode": "realtime" if (self.LIVE_PROVIDER == "gemini_live" and self.GEMINI_API_KEY) else ("turn_based_fallback" if (self.LIVE_PROVIDER == "gemini_turn_based" and self.GEMINI_API_KEY) else "offline_fallback"),
+                "model": self.LIVE_MODEL if (self.LIVE_PROVIDER == "gemini_live" and self.GEMINI_API_KEY) else (self.GEMINI_MODEL if (self.LIVE_PROVIDER == "gemini_turn_based" and self.GEMINI_API_KEY) else "deterministic_script"),
                 "production_ready": True
             },
-            "mistral": {
-                "real_provider": "mistral_chat_api",
+            "reasoning_tier": {
+                "real_provider": "google_gemini",
                 "deterministic_fallback": "deterministic_conversational_engine",
-                "active": "mistral_chat_api" if self.MISTRAL_API_KEY else "deterministic_conversational_engine",
-                "is_real": bool(self.MISTRAL_API_KEY),
-                "model": self.MISTRAL_MODEL,
-                "role": "conversational_turn_based_fallback",
+                "active": "google_gemini" if self.GEMINI_API_KEY else "deterministic_conversational_engine",
+                "is_real": bool(self.GEMINI_API_KEY),
+                "model": self.GEMINI_REASONING_MODEL,
+                "fast_model": self.GEMINI_MODEL,
+                "role": "deep_reasoning_and_turn_based_fallback",
                 "native_realtime_audio": False,
-                "production_ready": bool(self.MISTRAL_API_KEY)
+                "production_ready": bool(self.GEMINI_API_KEY)
             },
             "clickhouse": {
                 "real_provider": "clickhouse_server",

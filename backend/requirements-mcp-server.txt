@@ -1,0 +1,12 @@
+# ==============================================================================
+# Official ClickHouse MCP server - installed into its own virtualenv
+# ==============================================================================
+# AVATAROS connects to this server over a real MCP transport (stdio by default).
+# It is pinned separately from the application because `mcp-clickhouse` depends on
+# fastmcp 4.x -> starlette 1.x, while the AVATAROS FastAPI app pins starlette 0.4x.
+# Two environments, one protocol boundary between them.
+#
+#   uv venv backend/.mcp-server-venv --python 3.11
+#   uv pip install --python backend/.mcp-server-venv/bin/python -r backend/requirements-mcp-server.txt
+#
+mcp-clickhouse>=0.6.0,<0.7.0

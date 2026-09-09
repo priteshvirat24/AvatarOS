@@ -56,3 +56,8 @@ backend/static/media/*.mp3
 backend/static/media/*.json
 backend/static/media/frames/
 !backend/static/media/.gitkeep
+backend/.mcp-server-venv/
+
+# Local tooling and session artifacts (not part of the project)
+.claude/
+docs/VIDEO_SCRIPT.md
