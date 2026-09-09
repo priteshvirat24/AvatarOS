@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Play, Pause, RotateCcw, Volume2, Shield, Eye, Layers, Film, FileCode2, Sparkles, CheckCircle2, User, Activity, Video } from 'lucide-react';
 
 interface LiveStageProps {
@@ -61,6 +61,23 @@ export const LiveStage: React.FC<LiveStageProps> = ({
       setIsPlaying(true);
     }
   };
+
+  // React does not reliably reflect the `muted` prop onto the DOM element, and an
+  // unmuted element is blocked from autoplaying - which left the stage showing a
+  // black frame on arrival. Setting it on the node itself, then starting playback,
+  // makes the rendered performance visible without requiring a click.
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el) return;
+    el.muted = true;
+    el.play()
+      .then(() => setIsPlaying(true))
+      .catch(() => {
+        // Autoplay refused (some privacy configurations). The poster frame is
+        // still painted and the play control remains available.
+        setIsPlaying(false);
+      });
+  }, [activeMediaSrc]);
 
   const performanceScenes = [
     {
@@ -308,6 +325,12 @@ export const LiveStage: React.FC<LiveStageProps> = ({
               onEnded={() => setIsPlaying(false)}
               playsInline
               loop
+              // Autoplay muted so the stage shows the rendered performance on
+              // arrival. Without preload the element paints an empty black frame
+              // until someone presses play, which reads as a broken render.
+              muted
+              autoPlay
+              preload="metadata"
             />
 
             {/* Neural HUD Overlay (Section 14, Milestone 8) */}
@@ -562,36 +585,18 @@ export const LiveStage: React.FC<LiveStageProps> = ({
               </p>
             </div>
 
+            {repurposedClips.length === 0 ? (
+              <div style={{ padding: '32px 20px', textAlign: 'center' }}>
+                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                  No derivative clips yet
+                </p>
+                <p style={{ fontSize: '10.5px', color: 'var(--text-muted)', marginTop: '6px' }}>
+                  Run a production — platform cutdowns are generated from the approved master.
+                </p>
+              </div>
+            ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
-              {(repurposedClips.length ? repurposedClips : [
-                {
-                  clip_id: "clip_reel_01",
-                  target_platform: "instagram_reel",
-                  aspect_ratio: "9:16",
-                  title: "Build Pipeline Speed Hack",
-                  duration_s: 24.0,
-                  moment_score: 0.92,
-                  video_url: "/media/scene_1_en_9x16.mp4"
-                },
-                {
-                  clip_id: "clip_yt_shorts_02",
-                  target_platform: "youtube_shorts",
-                  aspect_ratio: "9:16",
-                  title: "40% Faster Local LLM",
-                  duration_s: 32.0,
-                  moment_score: 0.89,
-                  video_url: "/media/scene_1_en_9x16.mp4"
-                },
-                {
-                  clip_id: "clip_linkedin_03",
-                  target_platform: "linkedin",
-                  aspect_ratio: "16:9",
-                  title: "Local ML Architecture",
-                  duration_s: 45.0,
-                  moment_score: 0.86,
-                  video_url: "/media/master_video_en.mp4"
-                }
-              ]).map((clip) => (
+              {repurposedClips.map((clip) => (
                 <div
                   key={clip.clip_id}
                   className="glass-panel"
@@ -613,7 +618,12 @@ export const LiveStage: React.FC<LiveStageProps> = ({
                   <h4 style={{ fontSize: '13px', fontWeight: 700, marginBottom: '6px' }}>{clip.title}</h4>
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between' }}>
                     <span>Duration: {clip.duration_s}s</span>
-                    <span style={{ color: 'var(--accent-cyan)' }}>Moment Score: {(clip.moment_score * 100).toFixed(0)}%</span>
+                    <span
+                      style={{ color: 'var(--accent-cyan)' }}
+                      title="Weighted heuristic over script structure (hook strength, self-containment, emotion peak, platform fit). Not audience data."
+                    >
+                      Moment fit: {(clip.moment_score * 100).toFixed(0)}%
+                    </span>
                   </div>
                   <button
                     className="btn btn-primary"
@@ -625,6 +635,7 @@ export const LiveStage: React.FC<LiveStageProps> = ({
                 </div>
               ))}
             </div>
+            )}
           </div>
         )}
 

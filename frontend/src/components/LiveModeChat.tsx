@@ -149,7 +149,7 @@ export const LiveModeChat: React.FC<LiveModeChatProps> = ({ onHandoffToStudio })
         setProviderInfo((prev) => ({
           ...prev,
           provider: data.provider,
-          model: data.model || (data.provider.includes('mistral') ? 'mistral-small-latest' : 'gemini-2.5-flash'),
+          model: data.model || 'gemini-2.5-flash',
           degraded_mode: data.degraded_mode ?? false,
           is_realtime: data.is_realtime ?? false,
           ready: true
@@ -791,27 +791,25 @@ export const LiveModeChat: React.FC<LiveModeChatProps> = ({ onHandoffToStudio })
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontSize: '13px', fontWeight: 800 }}>
-                  {providerInfo.provider.includes('gemini')
+                  {providerInfo.provider === 'gemini_live'
                     ? 'GEMINI LIVE REAL-TIME RUNTIME'
-                    : (providerInfo.provider.includes('mistral')
-                        ? 'MISTRAL CONVERSATIONAL RUNTIME (TURN-BASED)'
+                    : (providerInfo.provider === 'gemini_turn_based'
+                        ? 'GEMINI CONVERSATIONAL RUNTIME (TURN-BASED)'
                         : 'LIVE CONVERSATIONAL RUNTIME (OFFLINE)')}
                 </span>
                 <span
                   className={`badge-neon ${
-                    providerInfo.provider.includes('gemini')
+                    providerInfo.provider === 'gemini_live'
                       ? 'badge-primary'
-                      : (providerInfo.provider.includes('mistral')
-                          ? 'badge-amber'
-                          : 'badge-amber')
+                      : 'badge-amber'
                   }`}
                   style={{ fontSize: '9px' }}
                 >
-                  {providerInfo.provider.includes('gemini')
+                  {providerInfo.provider === 'gemini_live'
                     ? '● REALTIME GEMINI LIVE'
-                    : (providerInfo.provider.includes('mistral')
-                        ? '● DEGRADED MISTRAL TURN-BASED'
-                        : '● OFFLINE FALLBACK')}
+                    : (providerInfo.provider === 'gemini_turn_based'
+                        ? '● GEMINI TURN-BASED (NOT REALTIME)'
+                        : '● DETERMINISTIC FALLBACK (OFFLINE)')}
                 </span>
               </div>
               <p style={{ fontSize: '10px', color: 'var(--text-muted)' }}>

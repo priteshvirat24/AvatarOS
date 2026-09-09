@@ -15,6 +15,8 @@ import { DemoGuide } from './components/DemoGuide';
 import { DnaModal } from './components/DnaModal';
 import { CompilerModal } from './components/CompilerModal';
 import { ProviderMatrixModal } from './components/ProviderMatrixModal';
+import { McpTracePanel } from './components/McpTracePanel';
+import { GovernanceLedger } from './components/GovernanceLedger';
 
 export const App: React.FC = () => {
   const [cast, setCast] = useState<any[]>([]);
@@ -30,16 +32,36 @@ export const App: React.FC = () => {
   const [isExecuting, setIsExecuting] = useState(false);
   const [activeSceneNo, setActiveSceneNo] = useState<number>(1);
   const [demoStep, setDemoStep] = useState<number>(2);
+  // Sub-view within the ClickHouse & MCP workspace.
+  const [evidenceTab, setEvidenceTab] = useState<'evolution' | 'trace' | 'governance'>('trace');
 
   // Modals
   const [dnaModalCharId, setDnaModalCharId] = useState<string | null>(null);
   const [showCompilerModal, setShowCompilerModal] = useState(false);
   const [showProviderMatrixModal, setShowProviderMatrixModal] = useState(false);
+  // Honest provider tally: how many subsystems are backed by a real service right
+  // now, out of how many exist. Previously hardcoded as "11/11", which claimed
+  // every provider was live regardless of configuration.
+  const [providerCounts, setProviderCounts] = useState<{ live: number; total: number } | null>(null);
 
   useEffect(() => {
     fetch('/api/cast')
       .then((r) => r.json())
       .then((data) => setCast(data))
+      .catch(console.error);
+
+    fetch('/api/production/provider-matrix')
+      .then((r) => r.json())
+      .then((data) => {
+        const matrix = data?.matrix ?? data?.provider_matrix ?? {};
+        const entries = Object.values(matrix).filter(
+          (v): v is { is_real?: boolean } => typeof v === 'object' && v !== null
+        );
+        setProviderCounts({
+          live: entries.filter((e) => e.is_real === true).length,
+          total: entries.length
+        });
+      })
       .catch(console.error);
 
     // Initial autonomous production run to populate studio stage
@@ -336,7 +358,7 @@ export const App: React.FC = () => {
             onClick={() => setShowProviderMatrixModal(true)}
           >
             <Cloud size={12} />
-            Providers &amp; Cloud (11/11)
+            Providers &amp; Cloud{providerCounts ? ` (${providerCounts.live}/${providerCounts.total} live)` : ''}
           </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <div className="status-dot active" />
@@ -480,7 +502,43 @@ export const App: React.FC = () => {
         )}
 
         {viewMode === 'evolution' && (
-          <ClickHouseEvolution />
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: '14px', gap: '12px' }}>
+            {/* Evidence sub-navigation: the runtime proof, the audit trail, and the loop they feed. */}
+            <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+              {([
+                { key: 'trace', label: 'MCP Trace', icon: <Terminal size={13} /> },
+                { key: 'governance', label: 'Governance Ledger', icon: <Shield size={13} /> },
+                { key: 'evolution', label: 'Evolution Loop', icon: <RefreshCw size={13} /> }
+              ] as const).map((tab) => (
+                <button
+                  key={tab.key}
+                  className="btn"
+                  onClick={() => setEvidenceTab(tab.key)}
+                  style={{
+                    padding: '7px 14px',
+                    fontSize: '11.5px',
+                    fontWeight: 700,
+                    backgroundColor: evidenceTab === tab.key ? 'var(--primary)' : 'var(--bg-surface)',
+                    color: evidenceTab === tab.key ? 'white' : 'var(--text-muted)',
+                    border: '1px solid var(--border-subtle)'
+                  }}
+                >
+                  {tab.icon}
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+              {evidenceTab === 'trace' && <McpTracePanel />}
+              {evidenceTab === 'governance' && <GovernanceLedger />}
+              {evidenceTab === 'evolution' && (
+                <div style={{ height: '100%', overflowY: 'auto' }}>
+                  <ClickHouseEvolution />
+                </div>
+              )}
+            </div>
+          </div>
         )}
 
         {viewMode === 'knowledge' && (

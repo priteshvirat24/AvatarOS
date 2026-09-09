@@ -40,7 +40,7 @@ export const ProviderMatrixModal: React.FC<ProviderMatrixModalProps> = ({ isOpen
     { key: 'guardian', name: 'Multimodal Guardian', icon: ShieldCheck, data: matrix.guardian },
     { key: 'asr', name: 'ASR / Speech Recognition', icon: Cpu, data: matrix.asr },
     { key: 'live', name: 'Live Conversation (Gemini Live)', icon: Sparkles, data: matrix.live },
-    { key: 'mistral', name: 'Mistral Conversational Fallback', icon: Cpu, data: matrix.mistral },
+    { key: 'reasoning_tier', name: 'Gemini Reasoning Tier', icon: Cpu, data: matrix.reasoning_tier },
     { key: 'clickhouse', name: 'ClickHouse Analytics', icon: Database, data: matrix.clickhouse },
     { key: 'mcp', name: 'MCP Partner Gateway', icon: Server, data: matrix.mcp },
     { key: 'storage', name: 'Media Storage', icon: Cloud, data: matrix.storage }

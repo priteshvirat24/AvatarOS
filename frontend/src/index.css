@@ -244,3 +244,27 @@ h1, h2, h3, h4, h5, h6 {
   border-radius: 2px;
   animation: waveform 1.2s ease-in-out infinite;
 }
+
+/* ---------------------------------------------------------------------------
+   Spinner
+   `animate-spin` was referenced by four components but never defined, so every
+   loading indicator in the app rendered frozen. Both names are provided because
+   the trace panel uses the shorter one.
+   --------------------------------------------------------------------------- */
+@keyframes avataros-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.animate-spin,
+.spin {
+  animation: avataros-spin 0.9s linear infinite;
+  transform-origin: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-spin,
+  .spin {
+    animation-duration: 2.4s;
+  }
+}

@@ -24,7 +24,9 @@ export const DemoGuide: React.FC<DemoGuideProps> = ({
   onOpenLiveMode,
   onOpenEvolution
 }) => {
-  const [minimized, setMinimized] = useState(false);
+  // Starts minimized. The guide is a floating overlay, so opening it by default
+  // covered the evidence panels it is meant to point at.
+  const [minimized, setMinimized] = useState(true);
 
   const steps = [
     {
