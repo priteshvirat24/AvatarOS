@@ -174,6 +174,10 @@ class InMemoryTelemetryProvider(BaseTelemetryProvider):
                 "avg_retention": round(avg_retention, 3),
                 "avg_ctr": round(avg_ctr, 4),
                 "n": n,
+                # Sample variance is carried through so a caller can run a real
+                # two-sample test; without it a significance check degenerates to
+                # "zero dispersion" and can only answer insufficient_data.
+                "var_watch": round(var, 6),
                 "ci_95": [round(ci_low, 3), round(ci_high, 3)],
                 "meets_sample_floor": n >= min_sample
             })
@@ -504,6 +508,7 @@ class ClickHouseTelemetryProvider(BaseTelemetryProvider):
                     "avg_retention": avg_ret,
                     "avg_ctr": avg_ctr,
                     "n": n,
+                    "var_watch": var_val,
                     "ci_95": [ci_low, ci_high],
                     "meets_sample_floor": n >= min_sample
                 })

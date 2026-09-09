@@ -6,6 +6,7 @@ from backend.app.data.telemetry_store import telemetry_store
 from backend.app.models.events import ProductionStrategy
 from backend.app.models.mcp import StrategyDecisionTrace, MCPToolResult
 from backend.app.mcp.client import mcp_client
+from backend.app.mcp.adapters import welch_t_test
 from backend.app.logging import app_logger
 
 class EvolutionAgent:
@@ -21,9 +22,20 @@ class EvolutionAgent:
     def __init__(self):
         self.decision_traces: List[StrategyDecisionTrace] = []
 
+    # Statistical guardrails. A proposal must clear every one of these before it is
+    # allowed to change how the actor performs.
+    MIN_SAMPLE_PER_ARM = 50
+    MIN_RELATIVE_LIFT = 0.05
+    ALPHA = 0.05
+
     def analyze_and_evolve(self, trace_id: str = "trace_evolution_mcp") -> Dict[str, Any]:
         """
-        Executes evolutionary strategy reasoning over ClickHouse evidence via governed MCP tool calls.
+        Reasons over ClickHouse evidence obtained through governed MCP tool calls.
+
+        Every figure below is derived from rows the partner server returned. When the
+        evidence does not clear the guardrails the strategy is left alone and the
+        refusal is returned with its reason - a rejected evolution is a correct
+        outcome, not an error to be papered over.
         """
         prev_strategy = telemetry_store.active_strategy
         decision_id = f"dec_{uuid.uuid4().hex[:12]}"
@@ -37,14 +49,17 @@ class EvolutionAgent:
             details={"decision_id": decision_id, "current_version": prev_strategy.strategy_version}
         )
 
-        # 1. MCP Tool Call: get_strategy_performance
+        # 1. Hook-arm distribution over the current period.
         mcp_res_perf: MCPToolResult = mcp_client.call_tool(
             agent_identity="evolution_agent",
             tool_name="get_strategy_performance",
-            arguments={"character_id": prev_strategy.character_id, "region": "IN", "min_sample_size": 50},
+            arguments={
+                "character_id": prev_strategy.character_id,
+                "region": prev_strategy.segment.get("region", "IN"),
+                "min_sample_size": self.MIN_SAMPLE_PER_ARM,
+            },
             trace_id=trace_id
         )
-
         if mcp_res_perf.status != "SUCCESS":
             app_logger.log_operation(
                 trace_id=trace_id,
@@ -53,11 +68,61 @@ class EvolutionAgent:
                 agent_task="evolution_agent",
                 details={"error": mcp_res_perf.error}
             )
-            raise RuntimeError(f"Evolution aborted: MCP query 'get_strategy_performance' failed: {mcp_res_perf.error}")
+            raise RuntimeError(
+                f"Evolution aborted: MCP query 'get_strategy_performance' failed: {mcp_res_perf.error}"
+            )
 
         query_analysis = mcp_res_perf.data or {}
+        rows = query_analysis.get("rows", [])
 
-        # 2. MCP Tool Call: compare_strategy_versions
+        if not rows:
+            return self._rejected(
+                decision_id, trace_id, prev_strategy, query_analysis, {},
+                mcp_res_perf, None, now_iso,
+                statistical_decision="FAIL_SAMPLE_SIZE",
+                reason=(
+                    "No hook arm met the minimum sample floor of "
+                    f"{self.MIN_SAMPLE_PER_ARM} impressions, so there is nothing to compare."
+                ),
+            )
+
+        # 2. Candidate is the best-performing arm; baseline is the arm currently in
+        #    use. Neither is assumed - both come out of the returned rows.
+        rows_sorted = sorted(rows, key=lambda r: r.get("avg_retention", 0.0), reverse=True)
+        candidate = rows_sorted[0]
+        baseline = next(
+            (r for r in rows if r.get("hook_type") == prev_strategy.hook_type),
+            rows_sorted[-1],
+        )
+
+        candidate_hook = candidate.get("hook_type")
+        candidate_n = int(candidate.get("n") or 0)
+        candidate_mean = float(candidate.get("avg_retention") or 0.0)
+        baseline_n = int(baseline.get("n") or 0)
+        baseline_mean = float(baseline.get("avg_retention") or 0.0)
+
+        candidate_ci = candidate.get("ci_95") or [None, None]
+        baseline_ci = baseline.get("ci_95") or [None, None]
+        ci_str = (
+            f"candidate {candidate_hook} 95% CI [{candidate_ci[0]}, {candidate_ci[1]}] "
+            f"vs baseline {baseline.get('hook_type')} [{baseline_ci[0]}, {baseline_ci[1]}]"
+        )
+
+        absolute_lift = round(candidate_mean - baseline_mean, 5)
+        relative_lift = round(absolute_lift / baseline_mean, 5) if baseline_mean else 0.0
+
+        # 3. Significance from the sample variance the query returned.
+        significance = welch_t_test(
+            mean_a=baseline_mean,
+            var_a=float(baseline.get("var_watch") or 0.0),
+            n_a=baseline_n,
+            mean_b=candidate_mean,
+            var_b=float(candidate.get("var_watch") or 0.0),
+            n_b=candidate_n,
+        )
+
+        # 4. Post-deployment comparison, when a later cohort already exists. This is
+        #    supplementary evidence and is allowed to be inconclusive.
         mcp_res_compare: MCPToolResult = mcp_client.call_tool(
             agent_identity="evolution_agent",
             tool_name="compare_strategy_versions",
@@ -65,68 +130,105 @@ class EvolutionAgent:
                 "character_id": prev_strategy.character_id,
                 "strategy_a": prev_strategy.strategy_version,
                 "strategy_b": prev_strategy.strategy_version + 1,
-                "metric": "avg_retention"
+                "metric": "retention",
             },
             trace_id=trace_id
         )
-
         compare_data = mcp_res_compare.data or {}
 
-        # 3. Deterministic Statistical Safeguards Evaluation
-        winning_hook = None
-        highest_retention = 0.0
-        sample_size = 0
-        ci_str = "95% CI non-overlapping"
-
-        rows = query_analysis.get("rows", [])
-        for r in rows:
-            if r.get("hook_type") == "question":
-                winning_hook = r
-                highest_retention = r.get("avg_retention", 0.712)
-                sample_size = r.get("n", 742)
-                ci_list = r.get("ci_95", [0.691, 0.733])
-                ci_str = f"[{ci_list[0]}, {ci_list[1]}]"
-                break
-
-        # Statistical Thresholds Check
-        sample_floor_met = sample_size >= 50
-        lift_val = 0.164  # +16.4% lift over baseline
-        stat_decision = "PASS" if sample_floor_met else "FAIL_SAMPLE_SIZE"
-
-        reasoning_summary = (
-            f"Strategy B (question hook) produced +{round(lift_val * 100, 1)}% higher retention "
-            f"over {sample_size} eligible ClickHouse impressions (95% CI {ci_str} vs baseline [0.525, 0.571]). "
-            f"Statistical guardrails satisfied. Strategy validated and marked ACTIVE."
+        # 5. Guardrails.
+        sample_floor_met = candidate_n >= self.MIN_SAMPLE_PER_ARM and baseline_n >= self.MIN_SAMPLE_PER_ARM
+        ci_separated = (
+            candidate_ci[0] is not None
+            and baseline_ci[1] is not None
+            and candidate_ci[0] > baseline_ci[1]
         )
+        lift_sufficient = relative_lift >= self.MIN_RELATIVE_LIFT
+        significant = bool(significance.get("statistically_significant"))
 
-        # 4. Propose and Apply Evolution to ClickHouse / Telemetry Store
+        if candidate_hook == prev_strategy.hook_type:
+            return self._rejected(
+                decision_id, trace_id, prev_strategy, query_analysis, compare_data,
+                mcp_res_perf, mcp_res_compare, now_iso,
+                statistical_decision="PASS",
+                reason=(
+                    f"The active '{prev_strategy.hook_type}' hook is still the best-performing arm "
+                    f"(mean retention {candidate_mean:.4f}, n={candidate_n}). No change is warranted."
+                ),
+                significance=significance,
+                candidate_summary=candidate,
+                baseline_summary=baseline,
+                ci_str=ci_str,
+                absolute_lift=absolute_lift,
+                relative_lift=relative_lift,
+                status="STRATEGY_UNCHANGED",
+            )
+
+        if not sample_floor_met:
+            decision = "FAIL_SAMPLE_SIZE"
+            reason = (
+                f"Sample floor of {self.MIN_SAMPLE_PER_ARM} not met "
+                f"(candidate n={candidate_n}, baseline n={baseline_n})."
+            )
+        elif not lift_sufficient:
+            decision = "FAIL_LIFT"
+            reason = (
+                f"Relative lift {relative_lift:.1%} is below the "
+                f"{self.MIN_RELATIVE_LIFT:.0%} minimum required to justify a strategy change."
+            )
+        elif not significant or not ci_separated:
+            decision = "FAIL_CONFIDENCE"
+            reason = (
+                f"Difference is not statistically separable: {significance.get('verdict')}"
+                + (f" (p={significance.get('p_value')})" if significance.get("p_value") is not None else "")
+                + f". {ci_str}."
+            )
+        else:
+            decision = "PASS"
+            reason = (
+                f"'{candidate_hook}' hook outperformed the active '{prev_strategy.hook_type}' hook by "
+                f"{relative_lift:.1%} relative ({absolute_lift:+.4f} absolute retention) over "
+                f"n={candidate_n} vs n={baseline_n} ClickHouse impressions. "
+                f"Welch's t-test p={significance.get('p_value')} at alpha={self.ALPHA}; {ci_str}. "
+                f"All guardrails satisfied."
+            )
+
+        if decision != "PASS":
+            return self._rejected(
+                decision_id, trace_id, prev_strategy, query_analysis, compare_data,
+                mcp_res_perf, mcp_res_compare, now_iso,
+                statistical_decision=decision,
+                reason=reason,
+                significance=significance,
+                candidate_summary=candidate,
+                baseline_summary=baseline,
+                ci_str=ci_str,
+                absolute_lift=absolute_lift,
+                relative_lift=relative_lift,
+            )
+
+        # 6. Apply the validated strategy.
         new_strategy = telemetry_store.propose_and_apply_evolution()
         candidate_version = new_strategy.strategy_version
 
-        # 5. Record Immutable Strategy Decision Trace
         decision_trace = StrategyDecisionTrace(
             decision_id=decision_id,
             trace_id=trace_id,
             character_id=new_strategy.character_id,
             current_strategy_version=prev_strategy.strategy_version,
             candidate_strategy_version=candidate_version,
-            evidence_queries=[
-                {"tool": "get_strategy_performance", "args": {"character_id": prev_strategy.character_id, "region": "IN"}},
-                {"tool": "compare_strategy_versions", "args": {"strategy_a": prev_strategy.strategy_version, "strategy_b": candidate_version}}
-            ],
-            evidence_results=[
-                {"query": "Query 881a", "rows_scanned": query_analysis.get("total_rows_scanned", 1842), "latency_ms": mcp_res_perf.latency_ms},
-                {"comparison": compare_data, "latency_ms": mcp_res_compare.latency_ms}
-            ],
-            sample_size=sample_size,
+            evidence_queries=self._evidence_queries(prev_strategy, candidate_version),
+            evidence_results=self._evidence_results(
+                query_analysis, compare_data, mcp_res_perf, mcp_res_compare
+            ),
+            sample_size=candidate_n,
             metric="avg_retention",
             confidence_interval=ci_str,
-            statistical_decision=stat_decision,
-            agent_reasoning_summary=reasoning_summary,
+            statistical_decision="PASS",
+            agent_reasoning_summary=reason,
             approval_status="ACTIVE",
             created_at=now_iso
         )
-
         self.decision_traces.append(decision_trace)
 
         app_logger.log_operation(
@@ -138,8 +240,9 @@ class EvolutionAgent:
                 "decision_id": decision_id,
                 "previous_version": prev_strategy.strategy_version,
                 "new_version": candidate_version,
-                "sample_size": sample_size,
-                "retention_lift": f"+{round(lift_val * 100, 1)}%",
+                "sample_size": candidate_n,
+                "relative_lift": relative_lift,
+                "p_value": significance.get("p_value"),
                 "approval_status": "ACTIVE"
             }
         )
@@ -151,21 +254,144 @@ class EvolutionAgent:
             "new_strategy_version": candidate_version,
             "telemetry_metrics": query_analysis,
             "proposed_strategy": new_strategy.model_dump(),
-            "mcp_governance": {
-                "decision_id": decision_id,
-                "tools_invoked": ["get_strategy_performance", "compare_strategy_versions"],
-                "mcp_provider": mcp_res_perf.server_identity,
-                "query_latency_ms": mcp_res_perf.latency_ms + mcp_res_compare.latency_ms,
-                "agent_identity": "evolution_agent"
-            },
+            "mcp_governance": self._mcp_governance(decision_id, mcp_res_perf, mcp_res_compare),
             "statistical_significance": {
                 "sample_floor_met": sample_floor_met,
-                "n_samples": sample_size,
-                "retention_lift": f"+{round(lift_val * 100, 1)}%",
+                "n_candidate": candidate_n,
+                "n_baseline": baseline_n,
+                "n_samples": candidate_n,
+                "candidate_hook": candidate_hook,
+                "baseline_hook": baseline.get("hook_type"),
+                "absolute_lift": absolute_lift,
+                "relative_lift": relative_lift,
                 "confidence_interval": ci_str,
-                "decision": stat_decision
+                "ci_non_overlapping": ci_separated,
+                "test": significance,
+                "decision": "PASS",
+                "rationale": reason,
             },
             "decision_trace": decision_trace.model_dump()
+        }
+
+    # ------------------------------------------------------------------ helpers
+
+    def _evidence_queries(self, prev_strategy, candidate_version) -> List[Dict[str, Any]]:
+        return [
+            {
+                "tool": "get_strategy_performance",
+                "args": {
+                    "character_id": prev_strategy.character_id,
+                    "region": prev_strategy.segment.get("region", "IN"),
+                },
+            },
+            {
+                "tool": "compare_strategy_versions",
+                "args": {
+                    "strategy_a": prev_strategy.strategy_version,
+                    "strategy_b": candidate_version,
+                },
+            },
+        ]
+
+    def _evidence_results(
+        self, query_analysis, compare_data, mcp_res_perf, mcp_res_compare
+    ) -> List[Dict[str, Any]]:
+        results = [{
+            "query_id": query_analysis.get("query_id"),
+            "sql": query_analysis.get("sql"),
+            "rows_returned": query_analysis.get("row_count"),
+            "latency_ms": mcp_res_perf.latency_ms,
+            "executed_via": query_analysis.get("executed_via"),
+        }]
+        if mcp_res_compare is not None:
+            results.append({
+                "query_id": compare_data.get("query_id"),
+                "sql": compare_data.get("sql"),
+                "rows_returned": compare_data.get("row_count"),
+                "latency_ms": mcp_res_compare.latency_ms,
+                "comparison": compare_data.get("significance"),
+            })
+        return results
+
+    def _mcp_governance(self, decision_id, mcp_res_perf, mcp_res_compare) -> Dict[str, Any]:
+        latency = mcp_res_perf.latency_ms + (mcp_res_compare.latency_ms if mcp_res_compare else 0.0)
+        return {
+            "decision_id": decision_id,
+            "tools_invoked": (
+                ["get_strategy_performance", "compare_strategy_versions"]
+                if mcp_res_compare else ["get_strategy_performance"]
+            ),
+            "mcp_provider": mcp_res_perf.server_identity,
+            "transport": mcp_res_perf.transport,
+            "is_simulated": mcp_res_perf.is_simulated,
+            "query_latency_ms": round(latency, 2),
+            "call_ids": [c.call_id for c in (mcp_res_perf, mcp_res_compare) if c is not None],
+            "agent_identity": "evolution_agent",
+        }
+
+    def _rejected(
+        self, decision_id, trace_id, prev_strategy, query_analysis, compare_data,
+        mcp_res_perf, mcp_res_compare, now_iso, *, statistical_decision, reason,
+        significance=None, candidate_summary=None, baseline_summary=None,
+        ci_str="", absolute_lift=0.0, relative_lift=0.0, status="STRATEGY_REJECTED",
+    ) -> Dict[str, Any]:
+        """
+        Records a refusal to evolve, with the same evidence trail as an acceptance.
+
+        Refusals are first-class: they are what stop a strategy from drifting on
+        noise, and they are preserved so the reasoning can be reviewed later.
+        """
+        decision_trace = StrategyDecisionTrace(
+            decision_id=decision_id,
+            trace_id=trace_id,
+            character_id=prev_strategy.character_id,
+            current_strategy_version=prev_strategy.strategy_version,
+            candidate_strategy_version=prev_strategy.strategy_version,
+            evidence_queries=self._evidence_queries(prev_strategy, prev_strategy.strategy_version + 1),
+            evidence_results=self._evidence_results(
+                query_analysis, compare_data, mcp_res_perf, mcp_res_compare
+            ),
+            sample_size=int((candidate_summary or {}).get("n") or 0),
+            metric="avg_retention",
+            confidence_interval=ci_str,
+            statistical_decision=statistical_decision,
+            agent_reasoning_summary=reason,
+            approval_status="REJECTED" if status == "STRATEGY_REJECTED" else "ACTIVE",
+            created_at=now_iso,
+        )
+        self.decision_traces.append(decision_trace)
+
+        app_logger.log_operation(
+            trace_id=trace_id,
+            operation="evolution_agent_mcp_complete",
+            status="REJECTED" if status == "STRATEGY_REJECTED" else "NO_CHANGE",
+            agent_task="evolution_agent",
+            details={"decision_id": decision_id, "reason": reason},
+        )
+
+        return {
+            "status": status,
+            "character_id": prev_strategy.character_id,
+            "previous_strategy_version": prev_strategy.strategy_version,
+            "new_strategy_version": prev_strategy.strategy_version,
+            "telemetry_metrics": query_analysis,
+            "proposed_strategy": prev_strategy.model_dump(),
+            "mcp_governance": self._mcp_governance(decision_id, mcp_res_perf, mcp_res_compare),
+            "statistical_significance": {
+                "sample_floor_met": int((candidate_summary or {}).get("n") or 0) >= self.MIN_SAMPLE_PER_ARM,
+                "n_candidate": int((candidate_summary or {}).get("n") or 0),
+                "n_baseline": int((baseline_summary or {}).get("n") or 0),
+                "n_samples": int((candidate_summary or {}).get("n") or 0),
+                "candidate_hook": (candidate_summary or {}).get("hook_type"),
+                "baseline_hook": (baseline_summary or {}).get("hook_type"),
+                "absolute_lift": absolute_lift,
+                "relative_lift": relative_lift,
+                "confidence_interval": ci_str,
+                "test": significance or {"verdict": "not_evaluated"},
+                "decision": statistical_decision,
+                "rationale": reason,
+            },
+            "decision_trace": decision_trace.model_dump(),
         }
 
     def get_decision_traces(self) -> List[Dict[str, Any]]:

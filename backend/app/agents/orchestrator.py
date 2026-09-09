@@ -1,5 +1,6 @@
 import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional, Callable
 
@@ -14,6 +15,7 @@ from backend.app.models.production import (
     FailureUX
 )
 from backend.app.data.telemetry_store import telemetry_store
+from backend.app.mcp.ledger import ledger
 from backend.app.data.production_store import production_store
 from backend.app.models.events import SceneImpressionEvent
 from backend.app.data.seed_characters import get_seed_characters
@@ -122,6 +124,38 @@ class OrchestratorAgent:
                 failure_detail=failure_detail
             )
             production_store.record_event(prod_run.run_id, ev)
+
+            # Append the decision to the immutable ClickHouse governance ledger.
+            # RUNNING is a progress marker, not a decision, so it is not recorded;
+            # everything that resolves a stage is. This is what makes "why was this
+            # blocked, and has it happened before?" answerable with a SELECT rather
+            # than by grepping logs.
+            if status != "RUNNING":
+                decision = {
+                    "BLOCKED": "BLOCK",
+                    "COMPLETED": "PASS",
+                    "REVISING": "WARN",
+                    "REWORKING": "WARN",
+                }.get(status, "WARN")
+                ledger.record_governance_event(
+                    trace_id=trace_id,
+                    run_id=prod_run.run_id,
+                    character_id=character_dna.character_id,
+                    character_version=character_dna.version,
+                    stage=stage.lower(),
+                    decision=decision,
+                    reason_code=error_code or "",
+                    # Fall through every description an event may carry. Stages that
+                    # are still in progress (a rework starting, for instance) carry
+                    # only an input_summary, and an audit row with an empty detail
+                    # answers no question at all.
+                    detail=(failure_detail or output_summary or input_summary or "")[:4000],
+                    actor=agent_name,
+                    severity="critical" if decision == "BLOCK" else (
+                        "warning" if decision == "WARN" else "info"
+                    ),
+                )
+
             if event_callback:
                 event_callback(stage, ev)
             return ev
@@ -191,7 +225,7 @@ class OrchestratorAgent:
             output_summary=f"Rights signed & active: {rights_rec.rights_id} (Holder: {rights_rec.likeness_holder})"
         )
 
-        # 1. Research Node (Hybrid Retrieval via Gemini ADK)
+        # 1. Research Node (hybrid retrieval, Gemini-reasoned)
         t1 = time.time()
         emit_event(
             agent_name="research_agent",
@@ -364,24 +398,46 @@ class OrchestratorAgent:
         scene_paths = []
         audio_paths = []
 
+        # Resolve each shot's line first, so synthesis and rendering agree on text.
+        shot_lines = []
         for shot in director_plan.shots:
             sc_script = next((s for s in raw_script.scenes if s.scene_no == shot.scene_no), None)
-            txt = sc_script.lines[0].text if sc_script and sc_script.lines else "Building..."
+            shot_lines.append(sc_script.lines[0].text if sc_script and sc_script.lines else "Building...")
 
-            voice_res = renderer.generate_voice_track(
-                text=txt,
+        # Synthesize all voice tracks concurrently. Real TTS is a network round
+        # trip per line, so doing this serially made a run wait on their sum -
+        # roughly three minutes for a five-scene bilingual production. Rendering
+        # stays sequential below: it is CPU-bound ffmpeg work and the master
+        # timeline depends on scene order.
+        def _synth(index_and_shot):
+            idx, shot = index_and_shot
+            return idx, renderer.generate_voice_track(
+                text=shot_lines[idx],
                 character_dna=character_dna,
                 language=req.language,
                 target_emotion=shot.target_emotion,
                 pace_multiplier=character_dna.speech.pace_multiplier,
                 trace_id=trace_id
             )
+
+        voice_results = [None] * len(director_plan.shots)
+        max_workers = max(1, min(settings.VOICE_CONCURRENCY, len(director_plan.shots)))
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            for idx, result in pool.map(_synth, list(enumerate(director_plan.shots))):
+                voice_results[idx] = result
+
+        for voice_res in voice_results:
             audio_paths.append(voice_res.audio_path)
 
-            path = renderer.render_scene(
+        # Scene renders are independent ffmpeg processes writing to distinct
+        # files, so they run concurrently too. Results are reassembled in shot
+        # order because the master timeline is stitched from this list.
+        def _render(index_and_shot):
+            idx, shot = index_and_shot
+            return idx, renderer.render_scene(
                 scene_no=shot.scene_no,
                 role=shot.role,
-                text=txt,
+                text=shot_lines[idx],
                 duration_s=shot.duration_s,
                 character_name=character_dna.character_id.capitalize(),
                 character_version=character_dna.version,
@@ -390,10 +446,16 @@ class OrchestratorAgent:
                 language=req.language,
                 character_dna=character_dna,
                 performance_plan=perf_plan,
-                audio_path=voice_res.audio_path,
+                audio_path=voice_results[idx].audio_path,
                 trace_id=trace_id
             )
-            scene_paths.append(path)
+
+        rendered = [None] * len(director_plan.shots)
+        render_workers = max(1, min(settings.RENDER_CONCURRENCY, len(director_plan.shots)))
+        with ThreadPoolExecutor(max_workers=render_workers) as pool:
+            for idx, path in pool.map(_render, list(enumerate(director_plan.shots))):
+                rendered[idx] = path
+        scene_paths.extend(rendered)
 
         master_video_path = renderer.stitch_master_video(
             scene_paths,
