@@ -690,10 +690,10 @@ export const CinematicJudgeMode: React.FC<CinematicJudgeModeProps> = ({
       overflow: 'hidden',
       fontFamily: 'Google Sans, Roboto, -apple-system, sans-serif'
     }}>
-      {/* 1. SWIFT AND SLOW 3D BACKGROUND ENGINE: Subtle, non-distracting watermark */}
+      {/* 1. VIVID, SWIFT AND SLOW 3D BACKGROUND: Prominently visible on white background */}
       <JudgeMode3DBackground
-        opacity={0.09}
-        speedMultiplier={0.25}
+        opacity={0.65}
+        speedMultiplier={0.5}
         activeChapter={currentChapter}
         activePoint={activePointIndex}
       />
@@ -936,7 +936,8 @@ export const CinematicJudgeMode: React.FC<CinematicJudgeModeProps> = ({
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.35, ease: "easeOut" }}
               style={{
-                backgroundColor: '#FFFFFF',
+                backgroundColor: 'rgba(255, 255, 255, 0.88)',
+                backdropFilter: 'blur(12px)',
                 borderRadius: '16px',
                 padding: '22px 24px',
                 boxShadow: '0 4px 16px rgba(60, 64, 67, 0.08), 0 1px 3px rgba(60, 64, 67, 0.04)',
@@ -1028,7 +1029,8 @@ export const CinematicJudgeMode: React.FC<CinematicJudgeModeProps> = ({
         {/* RIGHT COLUMN: ARCHITECTURAL TELEMETRY CARD */}
         <div style={{
           height: '460px',
-          backgroundColor: '#FFFFFF',
+          backgroundColor: 'rgba(255, 255, 255, 0.88)',
+          backdropFilter: 'blur(12px)',
           borderRadius: '16px',
           border: '1px solid #DADCE0',
           boxShadow: '0 4px 20px rgba(60, 64, 67, 0.08), 0 1px 3px rgba(60, 64, 67, 0.04)',
