@@ -294,6 +294,39 @@ class OrchestratorAgent:
             trace_id=trace_id
         )
         raw_script.language = req.language
+
+        # The claim-block harness must put the unsupported claim into the spoken
+        # script, not merely offer it to the writer.
+        #
+        # `include_unsupported_claim` only adds the claim to the prompt context.
+        # The deterministic generator obligingly used it, so the gate had
+        # something to catch - but a live model reads "unsupported" and correctly
+        # writes around it, leaving nothing to block. That is the system behaving
+        # well and the demonstration proving nothing. Splicing the claim in makes
+        # the harness test the gate rather than the writer's judgement.
+        if req.inject_claim_failure and raw_script.scenes:
+            unsupported = next(
+                (c for c in claims_status if c.get("claim_id") == "claim_fail_3x"), None
+            )
+            if unsupported:
+                target = raw_script.scenes[min(2, len(raw_script.scenes) - 1)]
+                if target.lines:
+                    target.lines[0].text = (
+                        f"{target.lines[0].text.rstrip('.')}. "
+                        f"{unsupported['claim_text']}."
+                    )
+                    app_logger.log_operation(
+                        trace_id=trace_id,
+                        operation="claim_failure_injected",
+                        status="INJECTED",
+                        agent_task="test_harness",
+                        details={
+                            "claim_id": unsupported["claim_id"],
+                            "scene_no": target.scene_no,
+                            "purpose": "verify the Publication Gate blocks an unsupported spoken claim",
+                        },
+                    )
+
         d_ms = (time.time() - t3) * 1000
         emit_event(
             agent_name="script_agent",

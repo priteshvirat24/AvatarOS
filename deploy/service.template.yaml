@@ -1,0 +1,115 @@
+# Cloud Run service: AVATAROS + a self-hosted ClickHouse sidecar.
+#
+# Two containers in one service share a network namespace, so the application
+# reaches ClickHouse on 127.0.0.1 with no external endpoint and no credentials to
+# distribute. The ClickHouse track permits a self-hosted cluster, and this keeps
+# the deployed URL self-contained.
+#
+# Storage is per-instance. The audit ledgers accumulate for the life of an
+# instance and are re-seeded when a new one starts, which is why min-instances is
+# 1 rather than 0. To use a managed cluster instead, drop the sidecar, point
+# CLICKHOUSE_URL at it and keep everything else identical.
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: SERVICE_NAME
+  labels:
+    cloud.googleapis.com/location: REGION
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "1"
+        autoscaling.knative.dev/maxScale: "3"
+        run.googleapis.com/cpu-throttling: "false"
+        # The app must not start before ClickHouse is accepting connections.
+        run.googleapis.com/container-dependencies: '{"app":["clickhouse"]}'
+    spec:
+      containerConcurrency: 40
+      timeoutSeconds: 300
+      containers:
+        - name: app
+          image: IMAGE_URI
+          ports:
+            - name: http1
+              containerPort: 8080
+          env:
+            - name: APP_ENV
+              value: "production"
+            - name: DEBUG
+              value: "false"
+            - name: SERVE_FRONTEND
+              value: "true"
+            - name: SEED_ON_START
+              value: "true"
+            - name: TELEMETRY_PROVIDER
+              value: "clickhouse"
+            - name: CLICKHOUSE_URL
+              value: "http://127.0.0.1:8123"
+            - name: CLICKHOUSE_DATABASE
+              value: "avataros"
+            - name: CLICKHOUSE_USERNAME
+              value: "avataros"
+            - name: CLICKHOUSE_PASSWORD
+              value: "CLICKHOUSE_PW"
+            - name: MCP_ENABLED
+              value: "true"
+            - name: MCP_PROVIDER
+              value: "clickhouse_mcp"
+            - name: MCP_TRANSPORT
+              value: "stdio"
+            - name: AI_PROVIDER
+              value: "gemini"
+            - name: LIVE_PROVIDER
+              value: "gemini_turn_based"
+            - name: VOICE_PROVIDER
+              value: "gemini_tts"
+            # ASR and the visual Guardian stay deterministic: the Guardian
+            # inspects HUD composites rather than faces, so enabling it would
+            # fail identity similarity and block every run.
+            - name: GUARDIAN_PROVIDER
+              value: "deterministic"
+            - name: ASR_PROVIDER
+              value: "deterministic"
+            - name: GEMINI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: avataros-gemini-api-key
+                  key: latest
+          resources:
+            limits:
+              cpu: "2"
+              memory: 2Gi
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 30
+            timeoutSeconds: 5
+
+        - name: clickhouse
+          image: clickhouse/clickhouse-server:24.8-alpine
+          env:
+            - name: CLICKHOUSE_DB
+              value: "avataros"
+            - name: CLICKHOUSE_USER
+              value: "avataros"
+            - name: CLICKHOUSE_PASSWORD
+              value: "CLICKHOUSE_PW"
+            - name: CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT
+              value: "1"
+          resources:
+            limits:
+              cpu: "1"
+              memory: 2Gi
+          startupProbe:
+            tcpSocket:
+              port: 8123
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 30
+  traffic:
+    - percent: 100
+      latestRevision: true

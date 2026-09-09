@@ -64,7 +64,9 @@ COPY --from=mcpdeps /opt/mcp-server-venv /opt/mcp-server-venv
 COPY backend /app/backend
 COPY --from=web /web/dist /app/frontend_dist
 
-RUN mkdir -p /app/backend/static/media
+COPY deploy/entrypoint.sh /usr/local/bin/avataros-entrypoint
+RUN chmod +x /usr/local/bin/avataros-entrypoint && \
+    mkdir -p /app/backend/static/media
 
 # Cloud Run supplies PORT; the default keeps `docker run` working locally.
 EXPOSE 8080
@@ -72,4 +74,4 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD curl -fsS "http://127.0.0.1:${PORT}/health" || exit 1
 
-CMD ["sh", "-c", "exec uvicorn backend.app.main:app --host 0.0.0.0 --port ${PORT}"]
+CMD ["/usr/local/bin/avataros-entrypoint"]
