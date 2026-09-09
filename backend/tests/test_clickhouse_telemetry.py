@@ -131,18 +131,37 @@ def test_strategy_version_persistence_and_lineage():
     assert 13 in versions
     assert 14 in versions
 
-def test_clickhouse_unreachable_fallback_resilience():
-    """Verify ClickHouseTelemetryProvider falls back safely if ClickHouse host is unreachable."""
+def test_clickhouse_unreachable_fallback_resilience(monkeypatch):
+    """
+    An unreachable cluster must degrade to the in-memory provider without raising.
+
+    The host is genuinely repointed at a closed port for the duration of
+    construction. The previous version of this test connected to the real cluster
+    and only nulled the client afterwards, so it asserted against whatever strategy
+    lineage happened to be in the database - which made it fail as soon as any
+    other test evolved a strategy.
+    """
+    from backend.app.config import settings as live_settings
+
     fallback_mock = InMemoryTelemetryProvider()
-    # Mock settings pointing to unreachable port
+    baseline_version = fallback_mock.active_strategy.strategy_version
+
+    monkeypatch.setattr(live_settings, "CLICKHOUSE_URL", "http://127.0.0.1:1", raising=False)
+    monkeypatch.setattr(live_settings, "CLICKHOUSE_CONNECT_TIMEOUT", 0.2, raising=False)
+
     bad_provider = ClickHouseTelemetryProvider(fallback_provider=fallback_mock)
-    # Simulate client failure
-    bad_provider.client = None
-    
-    # Must not raise; must delegate safely
+    assert bad_provider.client is None, "must not hold a client for an unreachable host"
+
+    # Must not raise; must delegate to the in-memory fallback.
     q_res = bad_provider.run_query_881a()
     assert q_res["query_id"] == "ch_query_881a"
-    assert bad_provider.active_strategy.strategy_version in (13, 14)
+    assert len(q_res["rows"]) >= 1
+    assert bad_provider.active_strategy.strategy_version == baseline_version
+
+    # Ingestion must also degrade quietly rather than losing events.
+    before = len(fallback_mock.events)
+    bad_provider.record_events(fallback_mock.events[:2])
+    assert len(fallback_mock.events) == before + 2
 
 def test_health_endpoints_with_clickhouse():
     """Verify /health and /health/ready report ClickHouse status."""

@@ -16,6 +16,7 @@ from backend.app.knowledge.bm25 import BM25Index
 from backend.app.knowledge.hybrid_retriever import HybridRetriever
 from backend.app.knowledge.knowledge_base import KnowledgeBase
 from backend.app.agents.research import ResearchAgent
+from backend.app.data.documents import ClaimVerification
 
 client = TestClient(app)
 
@@ -297,9 +298,53 @@ def test_research_agent_claim_resolution():
     )
 
     assert res.status == "verified"
-    assert res.confidence >= 0.90
     assert res.is_blocked is False
-    assert any(d["doc_id"] == "titan_benchmarks_mlperf_v2.pdf" for d in res.supporting_docs)
+
+    # Confidence is the hybrid retrieval score of the supporting passage, not a
+    # stored constant. It must clear the same threshold every other claim is held
+    # to, and it must equal the score recorded on the supporting document.
+    from backend.app.config import settings as _settings
+
+    supporting = [d for d in res.supporting_docs if d["doc_id"] == "titan_benchmarks_mlperf_v2.pdf"]
+    assert supporting, "the uploaded evidence must be cited as the supporting document"
+
+    evidence = supporting[-1]
+    assert res.confidence >= _settings.CLAIM_CONFIDENCE_THRESHOLD
+    assert res.confidence == evidence["retrieval_score"]
+    assert 0.0 < evidence["retrieval_score"] <= 1.0
+    assert evidence["semantic_score"] > 0
+    assert evidence["excerpt"], "the cited passage must carry the text it was matched on"
+    # The chunk id must belong to the uploaded document, not be synthesised.
+    assert evidence["chunk_id"].startswith("titan_benchmarks_mlperf_v2.pdf")
+
+
+def test_claim_stays_blocked_when_evidence_does_not_support_it():
+    """
+    Uploading a document is not the same as supporting a claim.
+
+    Evidence that retrieval cannot connect to the claim must leave it blocked -
+    otherwise "attach a PDF" becomes a way to launder any assertion past the gate.
+    """
+    agent = ResearchAgent()
+    agent.claims["claim_unsupported_demo"] = ClaimVerification(
+        claim_id="claim_unsupported_demo",
+        claim_text="This laptop cures seasonal allergies and improves eyesight",
+        status="blocked",
+        confidence=0.0,
+        is_blocked=True,
+        supporting_docs=[],
+        reasoning="Seeded for this test with no supporting evidence.",
+    )
+
+    res = agent.resolve_blocked_claim(
+        claim_id="claim_unsupported_demo",
+        uploaded_evidence_name="irrelevant_evidence.pdf",
+    )
+
+    assert res.is_blocked is True
+    assert res.status == "blocked"
+    assert res.confidence == 0.0
+    assert "no passage supporting this claim" in res.reasoning
 
 
 # ---------------------------------------------------------------------------

@@ -23,6 +23,28 @@ from backend.app.mcp.adapters import DeterministicMCPAdapter, ClickHouseMCPAdapt
 from backend.app.agents.evolution import evolution_agent
 from backend.app.data.telemetry_store import telemetry_store
 
+def _assert_result_envelope(data):
+    """
+    Every adapter payload must carry provenance: which query ran, how many rows
+    came back, where the answer came from, and whether it is simulated.
+    """
+    assert "query_id" in data
+    assert "sql" in data
+    assert "row_count" in data
+    assert data["row_count"] >= 0
+    assert data["data_source"] in (
+        "clickhouse_via_official_mcp_server",
+        "deterministic_simulation",
+    )
+    assert isinstance(data["is_simulated"], bool)
+    assert data["no_data"] == (data["row_count"] == 0)
+    if not data["is_simulated"]:
+        # A real answer must name the MCP server that produced it.
+        assert data["executed_via"]["protocol"] == "mcp"
+        assert data["executed_via"]["server"].startswith("mcp-clickhouse")
+        assert data["executed_via"]["tool"]
+
+
 client = TestClient(app)
 
 
@@ -131,23 +153,33 @@ def test_trace_id_and_agent_identity_propagation():
     assert res.latency_ms >= 0.0
 
 
-def test_clickhouse_mcp_query_scene_performance():
-    """Phase 4: query_scene_performance returns structured scene analytics."""
+def test_query_scene_performance_returns_measured_rows():
+    """
+    Scene analytics come back as real rows, each carrying its own sample size.
+
+    Deliberately asserts shape and internal consistency rather than a specific
+    retention figure: pinning an expected number here would re-introduce exactly
+    the hardcoded-metric problem this tool was rewritten to remove.
+    """
     res = mcp_client.call_tool(
         agent_identity="evolution_agent",
         tool_name="query_scene_performance",
-        arguments={"character_id": "maya", "scene_no": 1, "min_sample": 50}
+        arguments={"character_id": "maya", "min_sample": 50}
     )
     assert res.status == "SUCCESS"
     data = res.data
     assert data["character_id"] == "maya"
-    assert data["scene_no"] == 1
-    assert data["avg_watch_pct"] > 0.5
-    assert data["sample_size"] >= 50
+    _assert_result_envelope(data)
+
+    for scene in data["scenes"]:
+        assert scene["sample_size"] > 0
+        assert 0.0 <= scene["avg_watch_pct"] <= 1.0
+        # drop-off is the complement of watch percentage, computed by the query
+        assert abs((scene["avg_watch_pct"] + scene["dropoff_rate"]) - 1.0) < 0.01
 
 
-def test_clickhouse_mcp_get_strategy_performance():
-    """Phase 4: get_strategy_performance returns Query 881a distributions."""
+def test_get_strategy_performance_returns_query_881a_distribution():
+    """Hook-type distribution arrives with the variance needed for a real CI."""
     res = mcp_client.call_tool(
         agent_identity="evolution_agent",
         tool_name="get_strategy_performance",
@@ -155,27 +187,69 @@ def test_clickhouse_mcp_get_strategy_performance():
     )
     assert res.status == "SUCCESS"
     data = res.data
-    assert "rows" in data
-    assert "total_rows_scanned" in data
-    assert len(data["rows"]) >= 4
+    _assert_result_envelope(data)
+    assert data["query_id"] == "ch_query_881a"
+
     hook_types = [r["hook_type"] for r in data["rows"]]
     assert "question" in hook_types
     assert "statement" in hook_types
 
+    for row in data["rows"]:
+        assert row["n"] >= 50, "HAVING clause must exclude under-sampled arms"
+        assert row["meets_sample_floor"] is True
+        low, high = row["ci_95"]
+        assert low is not None and high is not None
+        assert low <= row["avg_retention"] <= high, "mean must sit inside its own CI"
 
-def test_clickhouse_mcp_compare_strategy_versions():
-    """Phase 4: compare_strategy_versions returns statistical lift."""
+    # The query orders by retention descending; verify the server honoured it.
+    retentions = [r["avg_retention"] for r in data["rows"]]
+    assert retentions == sorted(retentions, reverse=True)
+
+
+def test_compare_strategy_versions_reports_an_honest_verdict():
+    """
+    The comparison returns whatever the data supports - including "not enough
+    data". The previous implementation hardcoded `statistically_significant: True`
+    regardless of input; this test exists to make that regression impossible.
+    """
     res = mcp_client.call_tool(
         agent_identity="evolution_agent",
         tool_name="compare_strategy_versions",
-        arguments={"character_id": "maya", "strategy_a": 13, "strategy_b": 14, "metric": "avg_retention"}
+        arguments={"character_id": "maya", "strategy_a": 13, "strategy_b": 14, "metric": "retention"}
     )
     assert res.status == "SUCCESS"
     data = res.data
     assert data["character_id"] == "maya"
-    assert data["statistically_significant"] is True
-    assert data["retention_lift"] > 0.05
-    assert "justification" in data or "strategy_a" in data
+
+    sig = data["significance"]
+    assert sig["test"] == "welch_t_test"
+    assert sig["verdict"] in ("significant", "not_significant", "insufficient_data")
+    assert isinstance(sig["statistically_significant"], bool)
+
+    if sig["verdict"] == "insufficient_data":
+        # An honest refusal must explain itself and must not claim significance.
+        assert sig["statistically_significant"] is False
+        assert sig["reason"]
+    else:
+        # A real verdict must be derivable from the reported groups.
+        assert sig["statistically_significant"] == (sig["p_value"] < sig["alpha"])
+        for group in (data["strategy_a"], data["strategy_b"]):
+            assert group["sample_size"] >= 2
+            assert group["no_data"] is False
+
+
+def test_compare_strategy_versions_refuses_to_invent_a_missing_cohort():
+    """Comparing against a version with no telemetry yields insufficient_data."""
+    res = mcp_client.call_tool(
+        agent_identity="evolution_agent",
+        tool_name="compare_strategy_versions",
+        arguments={"character_id": "maya", "strategy_a": 13, "strategy_b": 9999}
+    )
+    assert res.status == "SUCCESS"
+    sig = res.data["significance"]
+    assert sig["verdict"] == "insufficient_data"
+    assert sig["statistically_significant"] is False
+    assert res.data["strategy_b"]["no_data"] is True
 
 
 def test_evolution_agent_mcp_evidence_preservation():
@@ -187,8 +261,17 @@ def test_evolution_agent_mcp_evidence_preservation():
     assert evolution_result["new_strategy_version"] >= 14
     assert "mcp_governance" in evolution_result
     assert "get_strategy_performance" in evolution_result["mcp_governance"]["tools_invoked"]
-    assert evolution_result["statistical_significance"]["sample_floor_met"] is True
-    assert evolution_result["statistical_significance"]["decision"] == "PASS"
+
+    stats = evolution_result["statistical_significance"]
+    assert stats["sample_floor_met"] is True
+    assert stats["decision"] == "PASS"
+    # A PASS is only legitimate if the underlying test actually found significance.
+    assert stats["test"]["statistically_significant"] is True
+    assert stats["test"]["p_value"] < stats["test"]["alpha"]
+    assert stats["relative_lift"] >= 0.05
+    # The winning arm must differ from the one that was active, otherwise there
+    # was nothing to change.
+    assert stats["candidate_hook"] != stats["baseline_hook"]
 
     # Verify Decision Trace
     traces = evolution_agent.get_decision_traces()
@@ -196,8 +279,19 @@ def test_evolution_agent_mcp_evidence_preservation():
     latest = traces[-1]
     assert latest["statistical_decision"] == "PASS"
     assert latest["sample_size"] >= 50
-    assert "question hook" in latest["agent_reasoning_summary"] or "Strategy B" in latest["agent_reasoning_summary"]
     assert latest["approval_status"] == "ACTIVE"
+
+    # The reasoning must name the arms and cite the evidence, not just assert a
+    # conclusion. Asserted by content rather than by exact phrasing so a wording
+    # change does not fail the test.
+    summary = latest["agent_reasoning_summary"]
+    assert stats["candidate_hook"] in summary
+    assert stats["baseline_hook"] in summary
+    assert "t-test" in summary
+
+    # Evidence must reference the SQL that was actually executed.
+    assert latest["evidence_results"]
+    assert latest["evidence_results"][0]["sql"]
 
 
 def test_strategy_lifecycle_human_boundary():
@@ -320,10 +414,16 @@ def test_deterministic_mcp_contract_test():
         trace_id="contract_test_trace"
     )
     assert res.status == "SUCCESS"
-    assert res.data["total_rows_scanned"] > 0
     assert res.latency_ms >= 0.0
+    # Offline results must announce themselves as simulated so the UI can label
+    # them, and must never be mistaken for measurements.
+    assert res.data["is_simulated"] is True
+    assert res.data["data_source"] == "deterministic_simulation"
+    assert res.data["row_count"] > 0
+    assert res.is_simulated is True
 
-    # 2. Strategy Comparison
+    # 2. Strategy comparison offline cannot produce a significance verdict,
+    #    because the simulation does not carry sample variance. It must say so.
     res_comp = client_inst.call_tool(
         agent_identity="evolution_agent",
         tool_name="compare_strategy_versions",
@@ -331,5 +431,129 @@ def test_deterministic_mcp_contract_test():
         trace_id="contract_test_trace"
     )
     assert res_comp.status == "SUCCESS"
-    assert res_comp.data["statistically_significant"] is True
-    assert res_comp.data["retention_lift"] > 0.05
+    sig = res_comp.data["significance"]
+    assert sig["verdict"] == "insufficient_data"
+    assert sig["statistically_significant"] is False
+    assert sig["reason"]
+
+    # 3. Governance ledgers do not exist offline - the adapter must decline
+    #    rather than fabricate an audit history.
+    res_ledger = client_inst.call_tool(
+        agent_identity="governance_console",
+        tool_name="get_governance_ledger",
+        arguments={"limit": 10},
+        trace_id="contract_test_trace"
+    )
+    assert res_ledger.status == "SUCCESS"
+    assert res_ledger.data["no_data"] is True
+    assert res_ledger.data["events"] == []
+    assert "unavailable_reason" in res_ledger.data
+
+
+
+# ---------------------------------------------------------------------------
+# Regression guards for the fabricated-analytics class of bug
+# ---------------------------------------------------------------------------
+
+def test_adapters_module_contains_no_hardcoded_metrics():
+    """
+    Guards the specific failure this integration was rewritten to eliminate:
+    analytics adapters that return invented constants dressed up as measurements.
+
+    The original implementation shipped `avg_watch_pct: 0.742`,
+    `retention_lift: 0.164`, `statistically_significant: True`,
+    `total_claims_audited: 142` and `mean_fidelity_score: 0.96`. Every number a
+    user sees must now originate in a row returned by a query, so none of those
+    literals may reappear in the adapter module.
+    """
+    import pathlib
+    import re
+
+    source = pathlib.Path("backend/app/mcp/adapters.py").read_text(encoding="utf-8")
+    code_lines = []
+    for line in source.split("\n"):
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            continue
+        code_lines.append(line)
+    code = "\n".join(code_lines)
+
+    banned_literals = ["0.742", "0.164", "0.712", "0.96", "0.88", "142", "0.082"]
+    for literal in banned_literals:
+        assert literal not in code, (
+            f"hardcoded metric {literal!r} reappeared in adapters.py - "
+            "analytics values must come from query results"
+        )
+
+    # `statistically_significant` may only ever be assigned from a computed
+    # boolean or an explicit False, never hardcoded True.
+    assert not re.search(r'"statistically_significant":\s*True', code), (
+        "significance must be computed by welch_t_test(), never asserted"
+    )
+
+
+def test_welch_t_test_is_honest_about_weak_evidence():
+    """The significance test must refuse, not guess, when evidence is thin."""
+    from backend.app.mcp.adapters import welch_t_test
+
+    # Too few observations.
+    thin = welch_t_test(0.5, 0.01, 1, 0.7, 0.01, 1)
+    assert thin["verdict"] == "insufficient_data"
+    assert thin["statistically_significant"] is False
+
+    # Identical distributions must not be called significant.
+    same = welch_t_test(0.60, 0.01, 500, 0.60, 0.01, 500)
+    assert same["statistically_significant"] is False
+
+    # A large, well-sampled separation must be detected.
+    clear = welch_t_test(0.55, 0.01, 500, 0.72, 0.01, 500)
+    assert clear["statistically_significant"] is True
+    assert clear["p_value"] < 0.05
+    assert clear["absolute_difference"] > 0
+
+    # Zero variance carries no information about dispersion.
+    degenerate = welch_t_test(0.5, 0.0, 100, 0.9, 0.0, 100)
+    assert degenerate["verdict"] == "insufficient_data"
+
+
+def test_sql_templates_reject_injection_attempts():
+    """
+    Agents supply typed arguments, never SQL. Anything that could change the
+    shape of a statement must be refused at the template boundary.
+    """
+    from backend.app.mcp import sql_templates as tpl
+
+    hostile = [
+        "maya'; DROP TABLE scene_events; --",
+        "maya' OR '1'='1",
+        "maya\\'",
+        "maya UNION SELECT * FROM system.users",
+    ]
+    for value in hostile:
+        with pytest.raises(tpl.TemplateArgumentError):
+            tpl.build_strategy_performance(value, "IN", 50)
+
+    # Numeric bounds are enforced rather than interpolated blindly.
+    with pytest.raises(tpl.TemplateArgumentError):
+        tpl.build_recent_production_metrics("maya", 10_000)
+    with pytest.raises(tpl.TemplateArgumentError):
+        tpl.build_recent_production_metrics("maya", "5; DROP TABLE scene_events")
+
+    # Metric names are mapped through an allowlist, not concatenated.
+    with pytest.raises(tpl.TemplateArgumentError):
+        tpl.build_compare_strategies("maya", 13, 14, "watch_pct FROM system.tables --")
+
+    # A legitimate call still renders.
+    query_id, sql = tpl.build_strategy_performance("maya", "IN", 50)
+    assert query_id == "ch_query_881a"
+    assert "'maya'" in sql and "'IN'" in sql
+
+
+def test_permission_matrix_covers_governance_console():
+    """The observability identity may read ledgers and nothing else."""
+    allowed = MCPToolPermissionPolicy.get_allowed_tools_for_agent("governance_console")
+    assert "get_mcp_call_ledger" in allowed
+    assert "get_governance_ledger" in allowed
+    # It must not be able to influence production strategy.
+    assert MCPToolPermissionPolicy.is_authorized("governance_console", "get_strategy_performance") is False
+    assert MCPToolPermissionPolicy.is_authorized("governance_console", "compare_strategy_versions") is False

@@ -11,7 +11,7 @@ from backend.app.ai.provider import (
     GoogleGeminiProvider,
     DeterministicFallbackAIProvider
 )
-from backend.app.ai.adk_runtime import ADKAgent
+from backend.app.ai.agent_runtime import StructuredAgent
 from backend.app.ai.tools import execute_tool, AGENT_TOOL_ALLOWLISTS
 from backend.app.agents.research import ResearchAgent, ResearchAnalysisProposal
 from backend.app.agents.script_agent import ScriptAgent
@@ -53,7 +53,7 @@ def test_gemini_provider_graceful_fallback():
 
 
 # ---------------------------------------------------------------------------
-# 2. ADK AGENT & TOOL ALLOWLIST PERMISSION SECURITY
+# 2. AGENT RUNTIME & TOOL ALLOWLIST PERMISSION SECURITY
 # ---------------------------------------------------------------------------
 
 def test_tool_permission_security_enforcement():
@@ -77,8 +77,8 @@ def test_tool_permission_security_enforcement():
     assert "not authorized to invoke tool" in str(exc_info.value)
 
 
-def test_adk_agent_structured_execution():
-    agent = ADKAgent(
+def test_agent_runtime_structured_execution():
+    agent = StructuredAgent(
         agent_name="test_agent",
         system_instruction="You are a test assistant.",
         allowed_tools=["get_character_dna"]
@@ -244,5 +244,5 @@ def test_health_endpoint_ai_observability():
     assert "ai" in data["services"]
     ai_info = data["services"]["ai"]
     assert "provider" in ai_info
-    assert "adk_enabled" in ai_info
-    assert ai_info["adk_enabled"] is True
+    assert "agent_runtime_enabled" in ai_info
+    assert ai_info["agent_runtime_enabled"] is True

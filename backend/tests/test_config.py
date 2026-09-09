@@ -14,7 +14,36 @@ def test_settings_development_defaults():
     assert "http://localhost:3000" in s.get_cors_origins()
     assert s.RENDERER_PROVIDER == "ffmpeg"
     assert s.LIVE_MODE_ENABLED is True
-    assert s.GEMINI_API_KEY is None  # Does not require API key to boot
+
+def test_boots_without_any_cloud_credentials():
+    """
+    The system must start with no API keys at all, and report that honestly.
+
+    Asserted against an explicitly credential-free Settings rather than the
+    ambient environment, so the result does not change depending on whether the
+    developer running the suite happens to have a key in their .env.
+    """
+    s = Settings(_env_file=None, GEMINI_API_KEY=None, CLICKHOUSE_PASSWORD=None)
+
+    assert s.GEMINI_API_KEY is None
+    matrix = s.get_provider_matrix()
+    # With no credential, nothing may claim to be a real provider.
+    assert matrix["ai"]["is_real"] is False
+    assert matrix["ai"]["active"] == "deterministic_rule_engine"
+    assert matrix["live"]["is_real"] is False
+
+
+def test_empty_string_credential_is_treated_as_absent():
+    """
+    `GEMINI_API_KEY=` in a .env produces SecretStr(''), which is a truthy object.
+    Left unhandled, every `bool(settings.GEMINI_API_KEY)` check reports a live
+    Gemini connection backed by no credential.
+    """
+    s = Settings(_env_file=None, GEMINI_API_KEY="   ", CLICKHOUSE_PASSWORD="")
+
+    assert s.GEMINI_API_KEY is None
+    assert s.CLICKHOUSE_PASSWORD is None
+    assert s.get_provider_matrix()["ai"]["is_real"] is False
 
 def test_environment_variable_overrides():
     s = Settings(
