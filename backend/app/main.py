@@ -1,4 +1,6 @@
+import asyncio
 import os
+import threading
 import time
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional
@@ -10,6 +12,7 @@ from pydantic import BaseModel
 from backend.app.data.seed_characters import get_seed_characters
 from backend.app.data.documents import SEED_CLAIMS
 from backend.app.data.telemetry_store import telemetry_store
+from backend.app.models.events import ProductionStrategy, StrategyEvidence
 from backend.app.agents.orchestrator import orchestrator
 from backend.app.agents.research import ResearchAgent
 from backend.app.agents.evolution import evolution_agent
@@ -18,6 +21,7 @@ from backend.app.agents.guardian import guardian_agent
 from backend.app.live.live_engine import LiveModeEngine
 from backend.app.live.session_manager import live_session_manager
 from backend.app.mcp.client import mcp_client
+from backend.app.mcp.ledger import ledger, mcp_call_feed
 from backend.app.models.live import (
     LiveSessionCreateRequest,
     LiveSessionResponse,
@@ -82,10 +86,14 @@ class CompileCharacterRequest(BaseModel):
     personality_brief: str = "Confident, analytical, witty developer advocate"
     rights_authorized: bool = True
 
-@app.get("/")
+@app.get("/api")
 def read_root():
     """
-    Backwards-compatible root endpoint reporting system version and environment.
+    Service descriptor.
+
+    Lives at /api rather than / because in a single-origin deployment the root
+    path belongs to the SPA. A judge opening the deployed URL should see the
+    product, not a JSON blob.
     """
     return {
         "status": "online",
@@ -94,13 +102,46 @@ def read_root():
         "environment": settings.APP_ENV
     }
 
+@app.on_event("startup")
+def startup_event():
+    """
+    Warms the MCP partner session so `/health` reports the true state.
+
+    Connecting spawns the official `mcp-clickhouse` subprocess and performs an MCP
+    handshake, which takes about a second - so it runs on a background thread and
+    the app starts serving immediately. Until it completes, health honestly reports
+    `ready: false` rather than optimistically claiming a connection.
+    """
+    if not settings.MCP_ENABLED:
+        return
+
+    def warm() -> None:
+        try:
+            mcp_client.ensure_initialized()
+        except Exception as exc:
+            app_logger.log_operation(
+                trace_id="system",
+                operation="mcp_warmup",
+                status="ERROR",
+                agent_task="startup",
+                details={"error": str(exc)},
+            )
+
+    threading.Thread(target=warm, name="avataros-mcp-warmup", daemon=True).start()
+
+
 @app.on_event("shutdown")
 def shutdown_event():
     """
-    Ensure pending telemetry in buffer is flushed to ClickHouse upon application exit.
+    Flush pending telemetry and close the MCP partner session on exit.
     """
     try:
         telemetry_store.flush()
+    except Exception:
+        pass
+    try:
+        from backend.app.mcp.mcp_session import mcp_server_session
+        mcp_server_session.stop()
     except Exception:
         pass
 
@@ -131,7 +172,7 @@ def health_check():
     ai_provider_state = {
         "provider": settings.AI_PROVIDER,
         "configured": bool(settings.GEMINI_API_KEY),
-        "adk_enabled": settings.ADK_ENABLED,
+        "agent_runtime_enabled": settings.AGENT_RUNTIME_ENABLED,
         "model": settings.GEMINI_MODEL if settings.GEMINI_API_KEY else "deterministic_fallback_engine"
     }
 
@@ -153,26 +194,28 @@ def health_check():
     }
 
     live_configured = (
-        bool(settings.GEMINI_API_KEY) if settings.LIVE_PROVIDER == "gemini_live"
-        else (bool(settings.MISTRAL_API_KEY) if settings.LIVE_PROVIDER == "mistral" else True)
+        bool(settings.GEMINI_API_KEY)
+        if settings.LIVE_PROVIDER in ("gemini_live", "gemini_turn_based")
+        else True
     )
     live_provider_state = {
         "provider": settings.LIVE_PROVIDER,
         "configured": live_configured,
         "ready": True,
-        "model": settings.LIVE_MODEL if settings.LIVE_PROVIDER == "gemini_live" else (settings.MISTRAL_MODEL if settings.LIVE_PROVIDER == "mistral" else "deterministic"),
+        "model": settings.LIVE_MODEL if settings.LIVE_PROVIDER == "gemini_live" else (settings.GEMINI_MODEL if settings.LIVE_PROVIDER == "gemini_turn_based" else "deterministic"),
         "voice": settings.LIVE_VOICE,
         "language": settings.LIVE_LANGUAGE,
         "active_sessions": len(live_session_manager.sessions) if "live_session_manager" in globals() else 0,
         "is_realtime": settings.LIVE_PROVIDER == "gemini_live" and bool(settings.GEMINI_API_KEY),
-        "degraded_mode": settings.LIVE_PROVIDER == "mistral" and bool(settings.MISTRAL_API_KEY)
+        "degraded_mode": settings.LIVE_PROVIDER == "gemini_turn_based" and bool(settings.GEMINI_API_KEY)
     }
 
-    mistral_state = {
-        "provider": "mistral",
-        "configured": bool(settings.MISTRAL_API_KEY),
-        "model": settings.MISTRAL_MODEL,
-        "role": "conversational_turn_based_fallback",
+    reasoning_tier_state = {
+        "provider": "google_gemini",
+        "configured": bool(settings.GEMINI_API_KEY),
+        "fast_model": settings.GEMINI_MODEL,
+        "reasoning_model": settings.GEMINI_REASONING_MODEL,
+        "role": "deep_reasoning_and_turn_based_fallback",
         "native_realtime_audio": False
     }
 
@@ -201,7 +244,7 @@ def health_check():
             "guardian": guardian_provider_state,
             "asr": asr_provider_state,
             "live": live_provider_state,
-            "mistral": mistral_state,
+            "reasoning_tier": reasoning_tier_state,
             "mcp": mcp_provider_state,
             "storage": media_storage.get_status(),
             "media_renderer": settings.RENDERER_PROVIDER,
@@ -249,10 +292,34 @@ def get_provider_matrix_endpoint():
     """
     Returns the real vs deterministic provider matrix for Studio observability.
     """
+    matrix = settings.get_provider_matrix()
+
+    # Configuration says what we intend; the runtime says what is actually true.
+    # For the two partner-critical subsystems, report the runtime, so a cluster
+    # that is configured but unreachable is never shown as live.
+    mcp_status = mcp_client.get_status()
+    matrix["mcp"].update({
+        "is_real": bool(mcp_status.get("ready") and not mcp_status.get("is_simulated")),
+        "active": mcp_status.get("server_identity") if mcp_status.get("ready") else "unavailable",
+        "server_identity": mcp_status.get("server_identity"),
+        "transport": mcp_status.get("transport"),
+        "server_tools": mcp_status.get("server_tools", []),
+        "last_error": mcp_status.get("last_error"),
+    })
+
+    clickhouse_connected = getattr(telemetry_store, "client", None) is not None
+    matrix["clickhouse"].update({
+        "is_real": bool(
+            settings.TELEMETRY_PROVIDER == "clickhouse" and clickhouse_connected
+        ),
+        "active": "clickhouse_server" if clickhouse_connected else "in_memory_telemetry",
+        "connected": clickhouse_connected,
+    })
+
     return {
         "version": settings.AVATAROS_VERSION,
         "environment": settings.APP_ENV,
-        "matrix": settings.get_provider_matrix()
+        "matrix": matrix
     }
 
 @app.get("/api/cast")
@@ -797,6 +864,90 @@ class MCPExecuteRequest(BaseModel):
     arguments: Dict[str, Any] = {}
     trace_id: Optional[str] = None
 
+@app.get("/api/evolution/analysis")
+def get_evolution_analysis(character_id: str = "maya", region: str = "IN"):
+    """
+    The hook-arm distribution the Evolution Agent reasons over, fetched through MCP.
+
+    Served from the backend rather than letting the browser call `/api/mcp/execute`
+    directly: agent identity is a security boundary, and a page must not be able to
+    assume one.
+    """
+    res = mcp_client.call_tool(
+        agent_identity="evolution_agent",
+        tool_name="get_strategy_performance",
+        arguments={"character_id": character_id, "region": region, "min_sample_size": 50},
+        trace_id=f"trace_evo_analysis_{int(time.time()*1000)}",
+    )
+    if res.status == "ERROR":
+        raise HTTPException(status_code=503, detail=res.error)
+
+    active = telemetry_store.active_strategy
+    return {
+        "active_strategy": active.model_dump(),
+        "rows": res.data.get("rows", []),
+        "no_data": res.data.get("no_data", True),
+        "compiled_sql": res.compiled_sql,
+        "server_identity": res.server_identity,
+        "transport": res.transport,
+        "latency_ms": res.latency_ms,
+        "rows_returned": res.rows_returned,
+        "is_simulated": res.is_simulated,
+    }
+
+
+@app.post("/api/evolution/reset")
+def reset_strategy_lineage():
+    """
+    Restores the v13 baseline strategy so the evolution demo can be replayed.
+
+    This is a demo affordance, not a production capability: once a strategy has
+    been adopted the guardrails correctly refuse to change it again, which is
+    exactly the behaviour we want but leaves nothing to show on a second run.
+    It resets strategy lineage only - telemetry and the audit ledgers are never
+    touched, because an audit trail you can erase is not an audit trail.
+    """
+    baseline = ProductionStrategy(
+        character_id="maya",
+        strategy_version=13,
+        segment={"region": "IN", "audience": "developers", "platform": "instagram_reel"},
+        hook_type="statement",
+        opening_duration_s_range=(8.5, 10.5),
+        shot_preference="medium_shot",
+        energy_bias=0.60,
+        evidence=StrategyEvidence(
+            sample_size=320,
+            retention_lift=0.0,
+            confidence="Baseline strategy",
+            source_query_id="ch_query_base",
+        ),
+        trace_id="trace_demo_reset",
+        applied_at=datetime.now(timezone.utc).isoformat(),
+    )
+
+    removed = False
+    client = getattr(telemetry_store, "client", None)
+    if client is not None:
+        try:
+            client.command("ALTER TABLE strategy_versions DELETE WHERE strategy_version > 13")
+            removed = True
+        except Exception as exc:
+            app_logger.log_operation(
+                trace_id="system", operation="strategy_reset", status="ERROR",
+                agent_task="demo", details={"error": str(exc)},
+            )
+
+    telemetry_store.active_strategy = baseline
+    evolution_agent.decision_traces.clear()
+
+    return {
+        "status": "RESET",
+        "active_strategy_version": 13,
+        "clickhouse_lineage_pruned": removed,
+        "note": "Telemetry and audit ledgers are intentionally left intact.",
+    }
+
+
 @app.get("/api/mcp/status")
 def get_mcp_status():
     """
@@ -835,6 +986,212 @@ def get_mcp_decision_traces():
     Milestone 7: Immutable audit trails of strategy decisions derived via MCP tools.
     """
     return {"traces": evolution_agent.get_decision_traces()}
+
+# ---------------------------------------------------------------------------
+# MCP Trace & Governance Forensics
+#
+# These endpoints back the in-app evidence panel. The distinction that matters:
+# `/api/mcp/trace/live` is an in-process mirror for instant feedback, while
+# `/api/mcp/trace/verify` re-reads the same calls out of ClickHouse *through the
+# official MCP server* and hands back the SQL that did it. The second one is the
+# proof; the first one is just responsive.
+# ---------------------------------------------------------------------------
+
+@app.get("/api/mcp/trace/live")
+def get_live_mcp_trace(limit: int = Query(default=50, ge=1, le=200)):
+    """Recent MCP calls from the in-process feed (low latency, not durable)."""
+    return {
+        "source": "in_process_feed",
+        "durable": False,
+        "note": "Mirror of recent calls. The durable record is in ClickHouse - use /api/mcp/trace/verify.",
+        "calls": mcp_call_feed.recent(limit=limit),
+    }
+
+
+@app.get("/api/mcp/trace/verify")
+def verify_mcp_trace_from_clickhouse(
+    limit: int = Query(default=25, ge=1, le=200),
+    agent: Optional[str] = None,
+):
+    """
+    Reads the MCP call ledger back out of ClickHouse via the official MCP server.
+
+    This request is itself an MCP call, so it appears in the very ledger it
+    returns on the next read - which is the point: partner usage is evidenced by
+    partner usage, not by a claim in a README.
+    """
+    res = mcp_client.call_tool(
+        agent_identity="governance_console",
+        tool_name="get_mcp_call_ledger",
+        arguments={"limit": limit, "agent_identity": agent},
+        trace_id=f"trace_verify_{int(time.time()*1000)}",
+    )
+    if res.status == "UNAUTHORIZED":
+        raise HTTPException(status_code=403, detail=res.error)
+    if res.status == "ERROR":
+        raise HTTPException(status_code=503, detail=res.error)
+    return {
+        "source": "clickhouse_via_official_mcp_server",
+        "durable": True,
+        "verification_call": {
+            "call_id": res.call_id,
+            "server_identity": res.server_identity,
+            "transport": res.transport,
+            "latency_ms": res.latency_ms,
+            "rows_returned": res.rows_returned,
+            "compiled_sql": res.compiled_sql,
+        },
+        "calls": res.data.get("calls", []),
+        "no_data": res.data.get("no_data", True),
+    }
+
+
+@app.get("/api/governance/ledger")
+def get_governance_ledger(
+    limit: int = Query(default=50, ge=1, le=200),
+    decision: Optional[str] = Query(default=None, pattern="^(PASS|BLOCK|WARN)$"),
+):
+    """
+    Immutable governance decisions, queried from ClickHouse through MCP.
+
+    This is the "why was this blocked?" endpoint - the answer is a row with a
+    reason code and a trace id, not a log line.
+    """
+    res = mcp_client.call_tool(
+        agent_identity="governance_console",
+        tool_name="get_governance_ledger",
+        arguments={"limit": limit, "decision": decision},
+        trace_id=f"trace_gov_{int(time.time()*1000)}",
+    )
+    if res.status == "ERROR":
+        raise HTTPException(status_code=503, detail=res.error)
+    return {
+        "events": res.data.get("events", []),
+        "no_data": res.data.get("no_data", True),
+        "compiled_sql": res.compiled_sql,
+        "server_identity": res.server_identity,
+        "latency_ms": res.latency_ms,
+        "rows_returned": res.rows_returned,
+        "is_simulated": res.is_simulated,
+    }
+
+
+@app.get("/api/governance/summary")
+def get_governance_summary(days: int = Query(default=90, ge=1, le=3650)):
+    """Decision counts per pipeline stage, from the governance ledger."""
+    res = mcp_client.call_tool(
+        agent_identity="governance_console",
+        tool_name="get_governance_summary",
+        arguments={"time_window_days": days},
+        trace_id=f"trace_govsum_{int(time.time()*1000)}",
+    )
+    if res.status == "ERROR":
+        raise HTTPException(status_code=503, detail=res.error)
+    return {
+        "breakdown": res.data.get("breakdown", []),
+        "no_data": res.data.get("no_data", True),
+        "compiled_sql": res.compiled_sql,
+        "server_identity": res.server_identity,
+        "latency_ms": res.latency_ms,
+        "is_simulated": res.is_simulated,
+    }
+
+
+@app.websocket("/ws/mcp-trace")
+async def mcp_trace_stream(websocket: WebSocket):
+    """
+    Streams MCP calls to the trace panel as they happen.
+
+    Calls are published from request threads, so they are handed to the event loop
+    with `call_soon_threadsafe` and drained here by a single consumer.
+    """
+    await websocket.accept()
+    loop = asyncio.get_running_loop()
+    queue: "asyncio.Queue[dict]" = asyncio.Queue(maxsize=500)
+
+    def on_call(call: dict) -> None:
+        loop.call_soon_threadsafe(_offer, queue, call)
+
+    unsubscribe = mcp_call_feed.subscribe(on_call)
+    try:
+        await websocket.send_json({
+            "event": "snapshot",
+            "status": mcp_client.get_status(),
+            "calls": mcp_call_feed.recent(limit=50),
+        })
+        while True:
+            try:
+                call = await asyncio.wait_for(queue.get(), timeout=20.0)
+                await websocket.send_json({"event": "mcp_call", "call": call})
+            except asyncio.TimeoutError:
+                await websocket.send_json({"event": "heartbeat"})
+    except WebSocketDisconnect:
+        pass
+    except Exception:
+        pass
+    finally:
+        unsubscribe()
+
+
+def _offer(queue: "asyncio.Queue", item: dict) -> None:
+    """Drops the oldest entry rather than blocking when a client falls behind."""
+    try:
+        queue.put_nowait(item)
+    except asyncio.QueueFull:
+        try:
+            queue.get_nowait()
+            queue.put_nowait(item)
+        except Exception:
+            pass
+
+
+# ---------------------------------------------------------------------------
+# Single-origin SPA hosting
+#
+# Registered after every API route so it can claim the remaining paths without
+# shadowing them. A client-side router needs unknown paths to return index.html
+# rather than 404, but /api and /ws must still 404 honestly when they are wrong -
+# a deep link silently returning HTML is far harder to debug than a 404.
+# ---------------------------------------------------------------------------
+
+if settings.SERVE_FRONTEND:
+    from fastapi.responses import FileResponse
+
+    _dist = os.path.abspath(settings.FRONTEND_DIST_PATH)
+    _index = os.path.join(_dist, "index.html")
+
+    if os.path.isdir(_dist) and os.path.exists(_index):
+        app.mount("/assets", StaticFiles(directory=os.path.join(_dist, "assets")), name="assets")
+
+        @app.get("/", include_in_schema=False)
+        def serve_spa_root():
+            return FileResponse(_index)
+
+        @app.get("/{full_path:path}", include_in_schema=False)
+        def serve_spa(full_path: str):
+            if full_path.startswith(("api/", "ws/", "media/", "health")):
+                raise HTTPException(status_code=404, detail="Not found")
+
+            candidate = os.path.normpath(os.path.join(_dist, full_path))
+            # Never serve anything outside the bundle directory.
+            if candidate.startswith(_dist) and os.path.isfile(candidate):
+                return FileResponse(candidate)
+            return FileResponse(_index)
+    else:
+        app_logger.log_operation(
+            trace_id="system",
+            operation="spa_mount",
+            status="SKIPPED",
+            agent_task="startup",
+            details={"reason": "no built frontend found", "path": _dist},
+        )
+
+if not settings.SERVE_FRONTEND:
+    @app.get("/", include_in_schema=False)
+    def root_descriptor():
+        """API-only mode: the root path reports service status."""
+        return read_root()
+
 
 @app.websocket("/ws/studio")
 async def websocket_endpoint(websocket: WebSocket):

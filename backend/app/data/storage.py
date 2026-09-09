@@ -134,21 +134,65 @@ class GCSMediaStorage(BaseMediaStorage):
         self._bucket = None
         self._is_configured = False
 
-        if self.bucket_name and settings.MEDIA_STORAGE_PROVIDER == "gcs":
-            try:
-                from google.cloud import storage
-                self._gcs_client = storage.Client()
-                self._bucket = self._gcs_client.bucket(self.bucket_name)
-                self._is_configured = True
-            except Exception as e:
-                app_logger.log_operation(
-                    trace_id="system",
-                    operation="gcs_storage_init_fallback",
-                    status="FALLBACK",
-                    agent_task="media_storage",
-                    details={"message": "Falling back to local media storage", "error": str(e)}
-                )
-                self._is_configured = False
+        self._init_error: Optional[str] = None
+
+        if settings.MEDIA_STORAGE_PROVIDER != "gcs":
+            # Not selected. Local storage is the intended behaviour, not a failure.
+            return
+
+        if not self.bucket_name:
+            self._init_error = "MEDIA_STORAGE_PROVIDER=gcs but GOOGLE_CLOUD_STORAGE_BUCKET is unset"
+            app_logger.log_operation(
+                trace_id="system",
+                operation="gcs_storage_init",
+                status="ERROR",
+                agent_task="media_storage",
+                details={"error": self._init_error, "consequence": "using local media storage"},
+            )
+            return
+
+        try:
+            from google.cloud import storage
+
+            self._gcs_client = storage.Client()
+            self._bucket = self._gcs_client.bucket(self.bucket_name)
+            # Confirm the bucket is actually reachable. Constructing a handle does
+            # no I/O, so without this the first failure would surface mid-render.
+            self._bucket.reload()
+            self._is_configured = True
+            app_logger.log_operation(
+                trace_id="system",
+                operation="gcs_storage_init",
+                status="CONNECTED",
+                agent_task="media_storage",
+                details={"bucket": self.bucket_name},
+            )
+        except ImportError as e:
+            self._init_error = (
+                f"google-cloud-storage is not installed ({e}). "
+                "Add it to backend/requirements.txt to enable the GCS media vault."
+            )
+            app_logger.log_operation(
+                trace_id="system", operation="gcs_storage_init", status="ERROR",
+                agent_task="media_storage",
+                details={"error": self._init_error, "consequence": "using local media storage"},
+            )
+            self._is_configured = False
+        except Exception as e:
+            # Configured but unreachable - wrong bucket, missing IAM, no ADC.
+            # Recorded as an error so the provider matrix can report it honestly
+            # instead of showing a green "gcs" that is really writing to /app.
+            self._init_error = f"{type(e).__name__}: {e}"
+            app_logger.log_operation(
+                trace_id="system", operation="gcs_storage_init", status="ERROR",
+                agent_task="media_storage",
+                details={
+                    "bucket": self.bucket_name,
+                    "error": self._init_error[:300],
+                    "consequence": "using local media storage",
+                },
+            )
+            self._is_configured = False
 
     def save_file(
         self,
@@ -207,13 +251,20 @@ class GCSMediaStorage(BaseMediaStorage):
         return self.fallback.exists(filename)
 
     def get_status(self) -> Dict[str, Any]:
-        return {
+        status = {
             "provider": "google_cloud_storage" if self._is_configured else "local_media_storage",
             "is_real_cloud": self._is_configured,
             "configured": self._is_configured,
             "ready": True,
-            "bucket": self.bucket_name if self._is_configured else "local_filesystem"
+            "bucket": self.bucket_name if self._is_configured else "local_filesystem",
         }
+        if self._init_error:
+            # GCS was requested and did not come up. Surfacing the reason is the
+            # difference between "storage is local by design" and "storage is
+            # local because something is broken and nobody noticed".
+            status["degraded"] = True
+            status["error"] = self._init_error[:300]
+        return status
 
 
 def get_media_storage() -> BaseMediaStorage:
