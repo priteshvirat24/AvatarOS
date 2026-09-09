@@ -1,101 +1,87 @@
 # ==============================================================================
-# Google Cloud Build Pipeline for AVATAROS
-# Builds and deploys AVATAROS Backend and Frontend to Google Cloud Run
+# Cloud Build -> Cloud Run for AVATAROS
+#
+# Builds ONE image (SPA + API + the official mcp-clickhouse server in its own
+# virtualenv) and deploys it as a single Cloud Run service. One image means one
+# public URL, no CORS, and nothing for a judge to configure.
+#
+# Every credential is read from Secret Manager at runtime. Nothing sensitive is
+# baked into the image or passed as a substitution.
+#
+#   gcloud builds submit --config cloudbuild.yaml \
+#     --substitutions=_LOCATION=us-central1,_SERVICE=avataros
 # ==============================================================================
 
-steps:
-  # ----------------------------------------------------------------------------
-  # Step 1: Build Backend Container (Python 3.12 + FFmpeg + Google GenAI)
-  # ----------------------------------------------------------------------------
-  - name: 'gcr.io/cloud-builders/docker'
-    args:
-      - 'build'
-      - '-t'
-      - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/avataros-repo/avataros-backend:$COMMIT_SHA'
-      - '-t'
-      - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/avataros-repo/avataros-backend:latest'
-      - '-f'
-      - 'backend/Dockerfile'
-      - '.'
-    id: 'build-backend'
-
-  # ----------------------------------------------------------------------------
-  # Step 2: Build Frontend Container (Vite + React SPA on Nginx)
-  # ----------------------------------------------------------------------------
-  - name: 'gcr.io/cloud-builders/docker'
-    args:
-      - 'build'
-      - '-t'
-      - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/avataros-repo/avataros-frontend:$COMMIT_SHA'
-      - '-t'
-      - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/avataros-repo/avataros-frontend:latest'
-      - '-f'
-      - 'frontend/Dockerfile'
-      - '.'
-    id: 'build-frontend'
-
-  # ----------------------------------------------------------------------------
-  # Step 3: Push Backend Image to Artifact Registry
-  # ----------------------------------------------------------------------------
-  - name: 'gcr.io/cloud-builders/docker'
-    args:
-      - 'push'
-      - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/avataros-repo/avataros-backend:$COMMIT_SHA'
-    id: 'push-backend'
-
-  # ----------------------------------------------------------------------------
-  # Step 4: Push Frontend Image to Artifact Registry
-  # ----------------------------------------------------------------------------
-  - name: 'gcr.io/cloud-builders/docker'
-    args:
-      - 'push'
-      - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/avataros-repo/avataros-frontend:$COMMIT_SHA'
-    id: 'push-frontend'
-
-  # ----------------------------------------------------------------------------
-  # Step 5: Deploy Backend to Google Cloud Run
-  # ----------------------------------------------------------------------------
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    entrypoint: 'gcloud'
-    args:
-      - 'run'
-      - 'deploy'
-      - 'avataros-backend'
-      - '--image=$_LOCATION-docker.pkg.dev/$PROJECT_ID/avataros-repo/avataros-backend:$COMMIT_SHA'
-      - '--region=$_LOCATION'
-      - '--platform=managed'
-      - '--allow-unauthenticated'
-      - '--port=8000'
-      - '--memory=2Gi'
-      - '--cpu=2'
-      - '--set-env-vars=APP_ENV=production,HOST=0.0.0.0,PORT=8000,MEDIA_STORAGE_PROVIDER=local'
-      - '--set-secrets=GEMINI_API_KEY=GEMINI_API_KEY:latest'
-    id: 'deploy-backend'
-
-  # ----------------------------------------------------------------------------
-  # Step 6: Deploy Frontend to Google Cloud Run
-  # ----------------------------------------------------------------------------
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    entrypoint: 'gcloud'
-    args:
-      - 'run'
-      - 'deploy'
-      - 'avataros-frontend'
-      - '--image=$_LOCATION-docker.pkg.dev/$PROJECT_ID/avataros-repo/avataros-frontend:$COMMIT_SHA'
-      - '--region=$_LOCATION'
-      - '--platform=managed'
-      - '--allow-unauthenticated'
-      - '--port=3000'
-      - '--memory=512Mi'
-      - '--cpu=1'
-    id: 'deploy-frontend'
-
 substitutions:
-  _LOCATION: 'us-central1'
-
-images:
-  - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/avataros-repo/avataros-backend:$COMMIT_SHA'
-  - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/avataros-repo/avataros-frontend:$COMMIT_SHA'
+  _LOCATION: us-central1
+  _SERVICE: avataros
+  _REPO: avataros-repo
+  # Comma-separated Secret Manager bindings. CLICKHOUSE_URL is a plain env var
+  # because it is not sensitive; the password and API key are secrets.
+  _SECRETS: 'CLICKHOUSE_PASSWORD=avataros-clickhouse-password:latest,GEMINI_API_KEY=avataros-gemini-api-key:latest'
+  _CLICKHOUSE_URL: ''
+  _CLICKHOUSE_DATABASE: default
+  _CLICKHOUSE_USERNAME: default
 
 options:
   logging: CLOUD_LOGGING_ONLY
+  machineType: E2_HIGHCPU_8
+
+images:
+  - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO/$_SERVICE:$SHORT_SHA'
+  - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO/$_SERVICE:latest'
+
+steps:
+  # --------------------------------------------------------------------------
+  # 1. Build the single application image.
+  # --------------------------------------------------------------------------
+  - id: build
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -t
+      - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO/$_SERVICE:$SHORT_SHA'
+      - -t
+      - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO/$_SERVICE:latest'
+      - -f
+      - Dockerfile
+      - .
+
+  # --------------------------------------------------------------------------
+  # 2. Push both tags.
+  # --------------------------------------------------------------------------
+  - id: push
+    name: gcr.io/cloud-builders/docker
+    args: ['push', '--all-tags', '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO/$_SERVICE']
+    waitFor: ['build']
+
+  # --------------------------------------------------------------------------
+  # 3. Deploy.
+  #
+  # min-instances=0 keeps the service inside the free tier while judging runs;
+  # the trade-off is a cold start on the first request, which the startup MCP
+  # warm-up absorbs on a background thread rather than blocking the response.
+  # --------------------------------------------------------------------------
+  - id: deploy
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - '$_SERVICE'
+      - '--image=$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPO/$_SERVICE:$SHORT_SHA'
+      - '--region=$_LOCATION'
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+      - '--port=8080'
+      - '--memory=1Gi'
+      - '--cpu=1'
+      - '--timeout=300'
+      - '--concurrency=40'
+      - '--min-instances=0'
+      - '--max-instances=3'
+      - '--set-env-vars=APP_ENV=production,DEBUG=false,SERVE_FRONTEND=true,TELEMETRY_PROVIDER=clickhouse,MCP_ENABLED=true,MCP_PROVIDER=clickhouse_mcp,MCP_TRANSPORT=stdio,AI_PROVIDER=gemini,LIVE_PROVIDER=gemini_live,CLICKHOUSE_URL=$_CLICKHOUSE_URL,CLICKHOUSE_DATABASE=$_CLICKHOUSE_DATABASE,CLICKHOUSE_USERNAME=$_CLICKHOUSE_USERNAME'
+      - '--set-secrets=$_SECRETS'
+    waitFor: ['push']
+
+timeout: 1800s

@@ -1,79 +1,115 @@
-version: '3.8'
+# ==============================================================================
+# AVATAROS - local stack
+#
+#   docker compose up --build          # ClickHouse + AVATAROS (schema + seed run
+#                                      # automatically on first start)
+#   open http://localhost:8080
+#
+# One application container serves both the SPA and the API, matching what is
+# deployed to Cloud Run, so what runs locally is what a judge sees hosted.
+# ==============================================================================
 
 services:
   clickhouse:
-    image: clickhouse/clickhouse-server:24.3-alpine
+    image: clickhouse/clickhouse-server:24.8-alpine
     container_name: avataros-clickhouse
     ports:
-      - "8123:8123"   # HTTP interface
-      - "9000:9000"   # Native protocol interface
+      - "8123:8123"
+      - "9000:9000"
     environment:
-      - CLICKHOUSE_DB=default
-      - CLICKHOUSE_USER=default
-      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
+      CLICKHOUSE_DB: avataros
+      CLICKHOUSE_USER: avataros
+      CLICKHOUSE_PASSWORD: avataros_dev_pw
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
     volumes:
       - clickhouse_data:/var/lib/clickhouse
-      - ./backend/init_clickhouse.sql:/docker-entrypoint-initdb.d/init_clickhouse.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost:8123/ping || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      # `wget --spider` on /ping is the cheapest readiness signal the image offers.
+      # 127.0.0.1 rather than `localhost`: the latter resolves to ::1 first, and
+      # ClickHouse cannot bind IPv6 in this container, so a healthy server would
+      # be reported unhealthy on a refused IPv6 connection.
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8123/ping || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
       start_period: 5s
-    networks:
-      - avataros_network
+    networks: [avataros_network]
 
-  backend:
+  # Applies the schema and loads seeded demo telemetry, then exits. The app waits
+  # for this to complete, so a fresh `docker compose up` lands on a populated
+  # cluster rather than an empty one showing "no data" everywhere.
+  seed:
     build:
       context: .
-      dockerfile: backend/Dockerfile
-    container_name: avataros-backend
-    ports:
-      - "8000:8000"
+      dockerfile: Dockerfile
+    container_name: avataros-seed
     environment:
-      - APP_ENV=development
-      - DEBUG=true
-      - HOST=0.0.0.0
-      - PORT=8000
-      - FRONTEND_URL=http://localhost:3000
-      - CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
-      - CLICKHOUSE_URL=http://clickhouse:8123
-      - CLICKHOUSE_DATABASE=default
-      - CLICKHOUSE_USERNAME=default
-      - VAULT_STORAGE_PATH=/app/backend/static/media
-      - RENDERER_PROVIDER=ffmpeg
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_DATABASE: avataros
+      CLICKHOUSE_USERNAME: avataros
+      CLICKHOUSE_PASSWORD: avataros_dev_pw
+      TELEMETRY_PROVIDER: clickhouse
+      MCP_ENABLED: "false"
+    command: ["python", "-m", "backend.app.data.seed_clickhouse"]
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    restart: "no"
+    networks: [avataros_network]
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: avataros-app
+    ports:
+      - "8080:8080"
+    environment:
+      APP_ENV: development
+      DEBUG: "true"
+      PORT: "8080"
+      SERVE_FRONTEND: "true"
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_DATABASE: avataros
+      CLICKHOUSE_USERNAME: avataros
+      CLICKHOUSE_PASSWORD: avataros_dev_pw
+      TELEMETRY_PROVIDER: clickhouse
+      # Speak to the OFFICIAL mcp-clickhouse server over a real MCP transport.
+      MCP_ENABLED: "true"
+      MCP_PROVIDER: clickhouse_mcp
+      MCP_TRANSPORT: stdio
+      # Set GEMINI_API_KEY to move the agent chain off the deterministic engine.
+      GEMINI_API_KEY: "${GEMINI_API_KEY:-}"
+      AI_PROVIDER: "${AI_PROVIDER:-deterministic}"
+      LIVE_PROVIDER: "${LIVE_PROVIDER:-deterministic}"
+      # ASR and the multimodal Guardian stay deterministic until real TTS exists:
+      # the voice provider emits tones, so Gemini ASR transcribes zero words and
+      # the script-adherence check would block every production.
+      # Real Gemini speech synthesis. Falls back to the deterministic tone
+      # engine (loudly) if the key is absent or a call fails.
+      VOICE_PROVIDER: "${VOICE_PROVIDER:-deterministic}"
+      GUARDIAN_PROVIDER: "${GUARDIAN_PROVIDER:-deterministic}"
+      ASR_PROVIDER: "${ASR_PROVIDER:-deterministic}"
+      VAULT_STORAGE_PATH: /app/backend/static/media
+      RENDERER_PROVIDER: ffmpeg
     volumes:
       - media_data:/app/backend/static/media
     depends_on:
       clickhouse:
-        condition: service_started
+        condition: service_healthy
+      seed:
+        condition: service_completed_successfully
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/health || exit 1"]
       interval: 15s
       timeout: 5s
-      retries: 3
-      start_period: 5s
-    networks:
-      - avataros_network
-
-  frontend:
-    build:
-      context: .
-      dockerfile: frontend/Dockerfile
-    container_name: avataros-frontend
-    ports:
-      - "3000:3000"
-    depends_on:
-      backend:
-        condition: service_started
-    networks:
-      - avataros_network
+      retries: 5
+      start_period: 25s
+    networks: [avataros_network]
 
 volumes:
   clickhouse_data:
-    driver: local
   media_data:
-    driver: local
 
 networks:
   avataros_network:
